@@ -1,0 +1,264 @@
+// E Property Ledger schema (STUDY_CONTEXT §7). Emergency core build, slice 1.
+// Parcels are points: PostGIS geometry(Point, 4326), written only through
+// parameterized $executeRaw tagged templates (never raw SQL from user input).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AppMeta {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}
+
+// FR-03: exactly four roles, no super admin.
+enum Role {
+  LEGAL
+  MANAGEMENT
+  TENANT
+  IT_ADMIN
+}
+
+// FR-08: pending -> approved | returned (with remarks) -> pending again on resubmit.
+enum ParcelStatus {
+  PENDING
+  APPROVED
+  RETURNED
+}
+
+enum IntegrityStatus {
+  VERIFIED
+  FAILED
+}
+
+// FR-13 lifecycle status (DECISIONS D4). SUPERSEDED is set only by replace (D2).
+enum DocumentStatus {
+  ACTIVE
+  UNDER_PROCESSING
+  WITH_THIRD_PARTY
+  EXPIRED
+  SUPERSEDED
+  MISSING
+  RECALLED
+}
+
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  email          String    @unique
+  name           String
+  role           Role
+  passwordHash   String    @map("password_hash")
+  // TOTP secret, encrypted by the app (AES-256-GCM). Null until MFA setup.
+  totpSecretEnc  String?   @map("totp_secret_enc")
+  mfaEnabled     Boolean   @default(false) @map("mfa_enabled")
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lockedUntil    DateTime? @map("locked_until")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  assignments    TenantAssignment[]
+  custodyRecords CustodyRecord[]
+  assignedIssues Issue[]
+
+  @@map("users")
+}
+
+model Parcel {
+  id             String                                @id @default(uuid()) @db.Uuid
+  name           String
+  region         String?
+  province       String
+  municipality   String?
+  titleNo        String?                               @map("title_no")
+  taxDecNo       String?                               @map("tax_dec_no")
+  classification String?
+  areaHa         Decimal                               @map("area_ha") @db.Decimal(10, 4)
+  location       Unsupported("geometry(Point, 4326)")?
+  status         ParcelStatus                          @default(PENDING)
+  remarks        String?
+  createdById    String                                @map("created_by_id") @db.Uuid
+  createdAt      DateTime                              @default(now()) @map("created_at")
+  updatedAt      DateTime                              @updatedAt @map("updated_at")
+
+  documents    Document[]
+  assignments  TenantAssignment[]
+  rptSchedules RptSchedule[]
+  issues       Issue[]
+
+  @@map("parcels")
+}
+
+model TenantAssignment {
+  userId   String @map("user_id") @db.Uuid
+  parcelId String @map("parcel_id") @db.Uuid
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parcel   Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+
+  @@id([userId, parcelId])
+  @@map("tenant_assignments")
+}
+
+model Document {
+  id              String          @id @default(uuid()) @db.Uuid
+  parcelId        String          @map("parcel_id") @db.Uuid
+  parcel          Parcel          @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  fileName        String          @map("file_name")
+  docType         String?         @map("doc_type")
+  sha256          String          @db.Char(64)
+  storagePath     String          @map("storage_path")
+  sizeBytes       Int             @map("size_bytes")
+  integrityStatus IntegrityStatus @default(VERIFIED) @map("integrity_status")
+  uploadedById    String          @map("uploaded_by_id") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at")
+  status          DocumentStatus  @default(ACTIVE)
+  // FR-10 version history (D2): all versions share group_id (the first version's id).
+  groupId         String          @map("group_id") @db.Uuid
+  version         Int             @default(1)
+  // FR-10 soft delete (D3): hidden from lists; file and hash stay for the audit history.
+  deletedAt       DateTime?       @map("deleted_at")
+  deletedById     String?         @map("deleted_by_id") @db.Uuid
+  // FR-14 (D10): expiry date of a time-bound document.
+  expiresOn       DateTime?       @map("expires_on") @db.Date
+
+  custodyRecords CustodyRecord[]
+  RptSchedule    RptSchedule[]
+
+  @@unique([groupId, version])
+  @@index([parcelId])
+  @@map("documents")
+}
+
+// FR-19: append-only, hash-chained. IDs and actions only, never content or personal data.
+// A DB trigger (migration) rejects UPDATE, DELETE and TRUNCATE.
+model AuditLog {
+  id        BigInt   @id @default(autoincrement())
+  prevHash  String   @map("prev_hash") @db.Char(64)
+  entryHash String   @unique @map("entry_hash") @db.Char(64)
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+  details   String?
+
+  @@map("audit_logs")
+}
+
+// FR-13 custody of originals (DECISIONS D5–D7). Append-only (DB trigger): every update is a
+// new row, so the rows form the custody chain.
+enum CustodyAction {
+  RELEASED
+  RETURNED
+  SENT_FOR_PROCESSING
+}
+
+enum HolderType {
+  COMPANY_VAULT
+  BANK
+  GOVERNMENT_OFFICE
+}
+
+model CustodyRecord {
+  id                 String         @id @default(uuid()) @db.Uuid
+  documentId         String         @map("document_id") @db.Uuid
+  document           Document       @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  action             CustodyAction
+  holderType         HolderType     @map("holder_type")
+  holderName         String         @map("holder_name")
+  referenceNo        String?        @map("reference_no")
+  releaseDate        DateTime?      @map("release_date") @db.Date
+  expectedReturnDate DateTime?      @map("expected_return_date") @db.Date
+  processingStage    String?        @map("processing_stage") @db.VarChar(120)
+  note               String?
+  statusAfter        DocumentStatus @map("status_after")
+  recordedById       String         @map("recorded_by_id") @db.Uuid
+  recordedBy         User           @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt          DateTime       @default(now()) @map("created_at")
+
+  @@index([documentId])
+  @@map("custody_records")
+}
+
+// FR-15 RPT schedules (DECISIONS D11). Quarterly due dates Mar 31, Jun 30, Sep 30, Dec 31.
+enum RptStatus {
+  UNPAID
+  PAID
+  OVERDUE
+}
+
+model RptSchedule {
+  id                String    @id @default(uuid()) @db.Uuid
+  parcelId          String    @map("parcel_id") @db.Uuid
+  parcel            Parcel    @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  year              Int
+  quarter           Int
+  amount            Decimal   @db.Decimal(14, 2)
+  dueDate           DateTime  @map("due_date") @db.Date
+  status            RptStatus @default(UNPAID)
+  // The LGU Treasurer's official receipt is the legal proof of payment (§18).
+  orNumber          String?   @map("or_number")
+  paidDate          DateTime? @map("paid_date") @db.Date
+  receiptDocumentId String?   @map("receipt_document_id") @db.Uuid
+  receiptDocument   Document? @relation(fields: [receiptDocumentId], references: [id], onDelete: SetNull)
+  createdById       String    @map("created_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@unique([parcelId, year, quarter])
+  @@index([dueDate])
+  @@map("rpt_schedules")
+}
+
+// FR-16 legal issues (DECISIONS D12). Types live in apps/api/src/issues/issue-types.ts.
+enum IssuePriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  ON_HOLD
+  RESOLVED
+}
+
+model Issue {
+  id          String              @id @default(uuid()) @db.Uuid
+  parcelId    String              @map("parcel_id") @db.Uuid
+  parcel      Parcel              @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  title       String
+  type        String
+  priority    IssuePriority
+  status      IssueStatus         @default(OPEN)
+  assigneeId  String              @map("assignee_id") @db.Uuid
+  assignee    User                @relation(fields: [assigneeId], references: [id], onDelete: Restrict)
+  description String?
+  createdById String              @map("created_by_id") @db.Uuid
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @default(now()) @updatedAt @map("updated_at")
+  changes     IssueStatusChange[]
+
+  @@index([parcelId])
+  @@map("issues")
+}
+
+// Append-only (DB trigger): every status change with its note.
+model IssueStatusChange {
+  id          String      @id @default(uuid()) @db.Uuid
+  issueId     String      @map("issue_id") @db.Uuid
+  issue       Issue       @relation(fields: [issueId], references: [id], onDelete: Restrict)
+  fromStatus  IssueStatus @map("from_status")
+  toStatus    IssueStatus @map("to_status")
+  note        String
+  changedById String      @map("changed_by_id") @db.Uuid
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@index([issueId])
+  @@map("issue_status_changes")
+}
