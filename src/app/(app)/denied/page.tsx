@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-// Page 07: shown when a Tenant opens a parcel that is not assigned to them.
+// Page 07: shown when a Tenant opens a parcel that is not assigned to them (DEMO_PAGES §3).
 export default function AccessDenied() {
   return (
     <div className="mx-auto mt-16 max-w-md rounded-xl border border-line bg-surface p-8 text-center">

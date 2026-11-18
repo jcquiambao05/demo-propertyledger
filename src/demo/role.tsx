@@ -18,6 +18,7 @@ export const ROLE_HOME: Record<Role, string> = {
   it: "/admin/audit",
 };
 
+/** docs/demo/DEMO_PAGES.md §4 */
 export const ROLE_NAV: Record<Role, { href: string; label: string }[]> = {
   legal: [
     { href: "/home", label: "Home" },

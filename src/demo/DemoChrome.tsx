@@ -7,7 +7,7 @@ import { ROLE_HOME, ROLE_LABEL, useRole, type Role } from "./role";
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[];
 
-/** Demo banner, role switcher and the dark theme for the IT role. */
+/** Demo banner, role switcher and the dark theme for the IT role (DEMO_PAGES §0, §1). */
 export function DemoChrome({ children }: { children: React.ReactNode }) {
   const { role, setRole } = useRole();
   const pathname = usePathname();

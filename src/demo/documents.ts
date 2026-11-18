@@ -1,4 +1,4 @@
-// Synthetic documents and custody records. Hashes are fake.
+// Synthetic documents and custody records. Parcel and title data: docs/STUDY_CONTEXT.md section 12. Hashes are fake.
 import { properties } from "./mock-data";
 
 export type DocStatus = "verified" | "failed";

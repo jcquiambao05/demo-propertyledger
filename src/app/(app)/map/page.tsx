@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { properties, type Property } from "@/demo/mock-data";
 
-// Static placeholder map: no tiles and no network calls.
+// Static placeholder map: no tiles and no network calls (DEMO_PAGES §3, page 10).
 const W = 640;
 const H = 520;
 const LAT = [6.5, 17.2];

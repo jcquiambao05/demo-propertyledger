@@ -1,3 +1,6 @@
+// Synthetic data only (docs/STUDY_CONTEXT.md §12, docs/demo/DEMO_PAGES.md §0).
+// Swap for API calls in real sprints. Wording follows STUDY_CONTEXT §3.
+
 export type ProblemKind = "tax" | "dispute" | "documents";
 
 export type Problem = { kind: ProblemKind; text: string; severity: "danger" | "warn" };
@@ -14,6 +17,7 @@ export type Property = {
   problems: Problem[];
 };
 
+// Parcels, titles, areas and problems: docs/STUDY_CONTEXT.md section 12 only (incoming copy). Coordinates are approximate.
 export const properties: Property[] = [
   {
     id: "iligan",
