@@ -1,4 +1,4 @@
-# Demo Property Ledger
+# Eagle Property Ledger
 
 Clickable UI demo of a corporate land portfolio system. Mock data only: no database, no backend, no network.
 
