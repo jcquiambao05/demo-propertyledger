@@ -2,24 +2,141 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global Custom 6px Pill Scrollbar System — Chromium-safe (no native ▲/▼ arrow buttons) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(86, 104, 94, 0.32);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 71, 42, 0.72);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(86, 104, 94, 0.35) transparent;
+  }
+}
+
 body {
-  @apply bg-page text-ink;
-  font-family: "Inter Variable", sans-serif;
+  @apply bg-page text-ink antialiased;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Smooth Page-Turn & Feedback Entrance Animation */
+@keyframes eplFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: eplFadeUp 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Architectural Survey Micro-Grid Background */
+.bg-survey-grid {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(26, 71, 42, 0.09) 1px, transparent 0),
+    linear-gradient(to right, rgba(26, 71, 42, 0.028) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(26, 71, 42, 0.028) 1px, transparent 1px);
+  background-size: 24px 24px, 96px 96px, 96px 96px;
 }
 
 @layer components {
-  .card { @apply rounded-xl border border-line bg-surface p-6; }
-  .btn-primary { @apply rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2; }
-  .btn-secondary { @apply rounded-lg border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-page disabled:opacity-50; }
-  .field { @apply mt-1 block w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30; }
-  .label { @apply block text-sm font-medium text-ink; }
-  .pill { @apply inline-block rounded-full bg-[#F2F4F7] px-2 py-0.5 text-xs text-[#475467]; }
-  .pill-danger { @apply inline-block rounded-full bg-danger-bg px-2 py-0.5 text-xs text-danger; }
-  .pill-warning { @apply inline-block rounded-full bg-warning-bg px-2 py-0.5 text-xs text-warning; }
-  .pill-ok { @apply inline-block rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand; }
+  /* Double-Bezel (Doppelrand) Machined Tray + Inner Core */
+  .bento-shell {
+    @apply rounded-[22px] border border-[#D4DDD4] bg-[#E7ECE6]/75 p-1.5 shadow-[0_4px_20px_-4px_rgba(18,29,23,0.05)];
+  }
+  .bento-core {
+    @apply rounded-[17px] border border-[#DCE3DC] bg-surface p-6 shadow-[0_1px_2px_rgba(18,29,23,0.03),inset_0_1px_0_rgba(255,255,255,0.9)];
+  }
+  .card {
+    @apply rounded-[18px] border border-[#DCE3DC] bg-surface p-6 shadow-[0_2px_10px_-2px_rgba(18,29,23,0.04),0_1px_2px_rgba(18,29,23,0.03)];
+  }
+  .glass-hud {
+    @apply rounded-[18px] border border-white/80 bg-white/[0.90] backdrop-blur-xl shadow-[0_14px_36px_-8px_rgba(18,29,23,0.14),0_1px_3px_rgba(18,29,23,0.06)];
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-[#1A472A] px-3.5 py-2 text-xs font-medium text-white shadow-[0_2px_6px_rgba(26,71,42,0.18)] transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-[#13361F] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1A472A] focus-visible:ring-offset-2;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-[#C8D3C8] bg-surface px-3.5 py-2 text-xs font-medium text-[#2A3B31] shadow-[0_1px_2px_rgba(18,29,23,0.03)] transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] hover:border-[#A8B9AA] hover:bg-[#F4F6F3] hover:text-ink active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+  .field {
+    @apply mt-1.5 block w-full rounded-lg border border-[#C8D3C8] bg-surface px-3 py-2 text-sm text-ink shadow-[0_1px_2px_rgba(18,29,23,0.03)] placeholder:text-[#84968B] transition-colors focus:border-[#1A472A] focus:outline-none focus:ring-2 focus:ring-[#1A472A]/15;
+  }
+  .label {
+    @apply block text-xs font-medium text-[#2A3B31];
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-[#DCE3DC] bg-[#F4F6F3] px-2.5 py-0.5 text-xs font-medium text-[#3E5046];
+  }
+  .pill-danger {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-[#FECDCA] bg-danger-bg px-2.5 py-0.5 text-xs font-medium text-danger;
+  }
+  .pill-warning {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-[#FEDF89] bg-warning-bg px-2.5 py-0.5 text-xs font-medium text-warning;
+  }
+  .pill-ok {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-[#B7D3BF] bg-[#EAF2EC] px-2.5 py-0.5 text-xs font-medium text-[#1A472A];
+  }
+
+  /* Minimalist dark-glass underline input autofill reset */
+  .auth-underline-input:-webkit-autofill,
+  .auth-underline-input:-webkit-autofill:hover,
+  .auth-underline-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ffffff;
+    caret-color: #ffffff;
+    transition: background-color 9999s ease-in-out 0s;
+    box-shadow: 0 0 0px 1000px transparent inset;
+  }
+}
+
+/* MapLibre popup override to match Double-Bezel Limestone aesthetic */
+.maplibregl-popup-content {
+  border-radius: 14px !important;
+  border: 1px solid #dce3dc !important;
+  padding: 12px 14px !important;
+  font-family: var(--font-geist-sans), system-ui, sans-serif !important;
+  box-shadow: 0 12px 32px -6px rgba(18, 29, 23, 0.18) !important;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .auth-glass-panel {
+    background-color: rgba(18, 25, 28, 0.94) !important;
+    backdrop-filter: none !important;
+  }
 }
 
 :focus-visible {
-  outline: 2px solid #1f5c3b;
+  outline: 2px solid #1a472a;
   outline-offset: 2px;
 }

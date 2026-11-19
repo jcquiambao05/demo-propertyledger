@@ -1,8 +1,11 @@
 "use client";
-// Figure 42 (V35 Audit log), IT Administrator, dark-blue theme. FR-19, FR-20.
-// Shows IDs, actions and hashes only; IT never sees parcel or document content.
-import { useCallback, useEffect, useState } from "react";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { Spinner } from "@/components/ConfirmModal";
+import { PaginationBar } from "@/components/PaginationBar";
+
+const AUDIT_PAGE_SIZE = 6;
 
 interface Entry {
   id: string;
@@ -30,6 +33,8 @@ export default function AuditPage() {
   const [result, setResult] = useState<Verify | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     try {
@@ -58,70 +63,149 @@ export default function AuditPage() {
     }
   }
 
+  const filtered = useMemo(() => {
+    if (!search.trim()) return entries;
+    const q = search.trim().toLowerCase();
+    return entries.filter(
+      (e) =>
+        e.action.toLowerCase().includes(q) ||
+        e.actor.toLowerCase().includes(q) ||
+        e.entity.toLowerCase().includes(q) ||
+        e.entryHash.toLowerCase().includes(q) ||
+        e.id.toLowerCase().includes(q),
+    );
+  }, [entries, search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  const pagedEntries = useMemo(() => {
+    const safePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / AUDIT_PAGE_SIZE)));
+    return filtered.slice((safePage - 1) * AUDIT_PAGE_SIZE, safePage * AUDIT_PAGE_SIZE);
+  }, [filtered, page]);
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-4">
-        <h1 className="text-2xl font-semibold">Audit log</h1>
-        {result &&
-          (result.ok ? (
-            <span className="rounded-full bg-it-okbg px-3 py-1 text-sm text-it-ok">
-              Chain intact · {result.checked} entries checked
-            </span>
-          ) : (
-            <span className="rounded-full bg-it-badbg px-3 py-1 text-sm text-it-bad">
-              Chain broken at entry #{result.firstBrokenId}
-            </span>
-          ))}
-        <button
-          type="button"
-          onClick={verify}
-          disabled={busy}
-          className="ml-auto rounded-lg bg-it-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {busy ? "Verifying…" : "Verify chain now"}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-[#76B82A]" aria-hidden="true" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-brand">
+              Activity History · IT Admin
+            </p>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <h1 className="text-xl font-semibold tracking-[-0.02em] text-ink">Audit Log</h1>
+            {result &&
+              (result.ok ? (
+                <span className="animate-fade-up pill-ok">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#76B82A]" aria-hidden="true" />
+                  Chain verified · {result.checked} entries intact ({result.ms} ms)
+                </span>
+              ) : (
+                <span className="animate-fade-up pill-danger">
+                  <span className="h-1.5 w-1.5 rounded-full bg-danger-dot" aria-hidden="true" />
+                  Mismatch found at entry #{result.firstBrokenId}
+                </span>
+              ))}
+          </div>
+          <p className="mt-1 text-xs text-muted">
+            <span className="font-mono tabular-nums">{filtered.length}</span> of{" "}
+            <span className="font-mono tabular-nums">{total}</span> logged events. Each entry is
+            cryptographically linked so changes can&apos;t go unnoticed.
+          </p>
+        </div>
+
+        <button type="button" onClick={verify} disabled={busy} className="btn-primary">
+          {busy && <Spinner className="h-3.5 w-3.5" />}
+          {busy ? "Checking log…" : "Verify chain"}
         </button>
       </div>
 
       {result && !result.ok && (
-        <div className="rounded-xl border border-it-line bg-it-badbg p-4 text-sm text-it-bad">
-          Entry #{result.firstBrokenId} does not match its {result.reason === "prev_hash" ? "link to the previous entry" : "stored hash"}.
-          Entries from this point cannot be trusted. Investigate direct database access.
+        <div className="animate-fade-up rounded-xl border border-danger-border bg-danger-bg p-4 text-xs text-danger">
+          Entry <span className="font-mono font-semibold">#{result.firstBrokenId}</span> doesn&apos;t
+          match its{" "}
+          {result.reason === "prev_hash" ? "link to the previous entry" : "recorded hash"}. Check for
+          unauthorized database changes.
         </div>
       )}
-      {error && <p className="text-sm text-it-bad">{error}</p>}
 
-      <p className="text-sm text-it-muted">Latest {entries.length} of {total} entries. Entries cannot be edited or deleted.</p>
-      <div className="overflow-x-auto rounded-xl border border-it-line bg-it-surface">
-        <table className="w-full text-left text-xs">
-          <thead className="border-b border-it-line text-it-muted">
-            <tr>
-              <th className="px-3 py-2 font-medium">#</th>
-              <th className="px-3 py-2 font-medium">Time</th>
-              <th className="px-3 py-2 font-medium">Actor</th>
-              <th className="px-3 py-2 font-medium">Action</th>
-              <th className="px-3 py-2 font-medium">Record</th>
-              <th className="px-3 py-2 font-medium">Entry hash</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((e) => (
-              <tr
-                key={e.id}
-                className={`border-b border-it-line last:border-0 ${result?.firstBrokenId === e.id ? "bg-it-badbg" : ""}`}
-              >
-                <td className="px-3 py-2">{e.id}</td>
-                <td className="px-3 py-2 whitespace-nowrap">{new Date(e.createdAt).toLocaleString()}</td>
-                <td className="px-3 py-2">{e.actor}</td>
-                <td className="px-3 py-2 font-mono">{e.action}</td>
-                <td className="px-3 py-2 font-mono">
-                  {e.entity}
-                  {e.entityId ? ` ${e.entityId.slice(0, 8)}` : ""}
-                </td>
-                <td className="px-3 py-2 font-mono text-it-muted">{e.entryHash.slice(0, 16)}…</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {error && (
+        <p role="alert" className="animate-fade-up rounded-xl border border-danger-border bg-danger-bg px-4 py-3 text-xs text-danger">
+          {error}
+        </p>
+      )}
+
+      <div className="bento-shell">
+        <div className="bento-core overflow-hidden p-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-[#F8FAF8] px-5 py-3">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by action, person, record, or hash…"
+              aria-label="Search audit entries"
+              className="w-72 rounded-lg border border-[#C8D3C8] bg-white px-3 py-1.5 text-xs text-ink placeholder:text-[#84968B] focus:border-brand focus:outline-none"
+            />
+            <span className="font-mono text-[11px] text-muted">
+              Tamper-evident SHA-256 log
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-line bg-[#F7F9F6] text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+                <tr>
+                  <th className="px-4 py-3">#</th>
+                  <th className="px-4 py-3">Time</th>
+                  <th className="px-4 py-3">Person</th>
+                  <th className="px-4 py-3">Action</th>
+                  <th className="px-4 py-3">Record</th>
+                  <th className="px-4 py-3">Hash (SHA-256)</th>
+                </tr>
+              </thead>
+              <tbody key={page} className="animate-fade-up divide-y divide-line">
+                {pagedEntries.map((e) => (
+                  <tr
+                    key={e.id}
+                    className={`transition-colors ${
+                      result?.firstBrokenId === e.id ? "bg-danger-bg" : "hover:bg-[#F8FAF8]"
+                    }`}
+                  >
+                    <td className="px-4 py-3 font-mono tabular-nums text-[#3E5046]">{e.id}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono tabular-nums text-[#3E5046]">
+                      {new Date(e.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-ink">{e.actor}</td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-md border border-[#DCE3DC] bg-[#F4F6F3] px-2 py-0.5 font-mono text-[11px] font-medium text-[#1A472A]">
+                        {e.action}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[#3E5046]">
+                      {e.entity}
+                      {e.entityId ? ` · ${e.entityId.slice(0, 8)}` : ""}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-muted">
+                      {e.entryHash.slice(0, 18)}…
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length === 0 && (
+            <p className="p-8 text-center text-xs text-muted">No matching activity found.</p>
+          )}
+          <PaginationBar
+            page={page}
+            pageSize={AUDIT_PAGE_SIZE}
+            totalItems={filtered.length}
+            onPageChange={setPage}
+          />
+        </div>
       </div>
     </div>
   );

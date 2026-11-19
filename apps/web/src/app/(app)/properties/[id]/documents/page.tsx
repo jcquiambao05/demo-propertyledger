@@ -1,12 +1,15 @@
 "use client";
-// Figure 22 (V15 Property documents), Figure 23 (V16 Upload, without AI in this build). FR-10, FR-12,
-// FR-13 (lifecycle status column).
+
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { api, ApiError } from "@/lib/api";
 import { STATUS_LABEL } from "@/components/CustodyPanel";
+import { Spinner } from "@/components/ConfirmModal";
+import { PaginationBar } from "@/components/PaginationBar";
+
+const DOCS_PAGE_SIZE = 5;
 
 interface Doc {
   id: string;
@@ -30,6 +33,7 @@ export default function DocumentsPage() {
   const [saved, setSaved] = useState("");
   const [types, setTypes] = useState<{ name: string; timeBound: boolean }[]>([]);
   const [docType, setDocType] = useState("");
+  const [page, setPage] = useState(1);
   const timeBound = types.find((t) => t.name === docType)?.timeBound ?? false;
 
   useEffect(() => {
@@ -63,9 +67,10 @@ export default function DocumentsPage() {
         method: "POST",
         body: new FormData(e.currentTarget),
       });
-      setSaved(`Uploaded. Hash saved: ${doc.sha256.slice(0, 16)}…`);
+      setSaved(`File uploaded and verified (${doc.sha256.slice(0, 14)}…).`);
       (e.target as HTMLFormElement).reset();
       setDocType("");
+      setPage(1);
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -75,20 +80,22 @@ export default function DocumentsPage() {
   }
 
   const failed = docs.filter((d) => d.integrityStatus === "FAILED");
+  const safePage = Math.min(page, Math.max(1, Math.ceil(docs.length / DOCS_PAGE_SIZE)));
+  const pagedDocs = docs.slice((safePage - 1) * DOCS_PAGE_SIZE, safePage * DOCS_PAGE_SIZE);
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <div>
-        <Link href={`/properties/${id}`} className="text-sm text-brand hover:underline">
+    <div className="w-full space-y-6">
+      <div className="border-b border-line pb-5">
+        <Link href={`/properties/${id}`} className="text-xs font-medium text-brand hover:underline">
           ← {parcel?.name ?? "Property"}
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold">Documents</h1>
+        <h1 className="mt-1.5 text-xl font-semibold tracking-[-0.02em] text-ink">Documents</h1>
       </div>
 
       {failed.length > 0 && (
-        <div className="rounded-xl border border-danger-dot bg-danger-bg p-4 text-sm text-danger">
-          {failed.length} file(s) failed the integrity check and are blocked. Replace them with a
-          verified copy.
+        <div className="animate-fade-up rounded-xl border border-danger-border bg-danger-bg p-4 text-xs text-danger">
+          {failed.length} file(s) didn&apos;t pass the file check and were blocked. Please upload a
+          fresh copy.
         </div>
       )}
 
@@ -104,10 +111,10 @@ export default function DocumentsPage() {
               type="file"
               accept="application/pdf"
               required
-              className="mt-1 text-sm"
+              className="mt-1.5 text-xs text-[#475467] file:mr-3 file:rounded-md file:border file:border-[#D0D5DD] file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink hover:file:bg-[#F9FAFB]"
             />
           </div>
-          <div>
+          <div className="min-w-[220px] flex-1">
             <label htmlFor="docType" className="label">
               Document type
             </label>
@@ -120,7 +127,7 @@ export default function DocumentsPage() {
               className="field"
             >
               <option value="" disabled>
-                Choose a type
+                Select document type…
               </option>
               {types.map((t) => (
                 <option key={t.name} value={t.name}>
@@ -128,68 +135,82 @@ export default function DocumentsPage() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-muted">
-              AI suggestion unavailable — choose the document type.
-            </p>
           </div>
           {timeBound && (
             <div>
               <label htmlFor="expiresOn" className="label">
                 Expiry date
               </label>
-              <input id="expiresOn" name="expiresOn" type="date" required className="field" />
+              <input id="expiresOn" name="expiresOn" type="date" required className="field font-mono" />
             </div>
           )}
           <button type="submit" disabled={busy} className="btn-primary">
-            {busy ? "Uploading…" : "Upload"}
+            {busy && <Spinner className="h-3.5 w-3.5" />}
+            {busy ? "Uploading…" : "Upload file"}
           </button>
-          {saved && <p className="w-full text-sm text-brand">{saved}</p>}
+          {saved && <p className="animate-fade-up w-full font-mono text-xs text-brand">{saved}</p>}
         </form>
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="animate-fade-up rounded-lg border border-danger-border bg-danger-bg px-3.5 py-2.5 text-xs text-danger">
           {error}
         </p>
       )}
 
-      <div className="card overflow-x-auto p-0">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-line text-muted">
-            <tr>
-              <th className="px-4 py-3 font-medium">File</th>
-              <th className="px-4 py-3 font-medium">Type</th>
-              <th className="px-4 py-3 font-medium">Uploaded</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Integrity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {docs.map((d) => (
-              <tr key={d.id} className="border-b border-line last:border-0">
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/documents/${d.id}`}
-                    className="font-medium text-brand hover:underline"
-                  >
-                    {d.fileName}
-                  </Link>
-                </td>
-                <td className="px-4 py-3">{d.docType ?? "—"}</td>
-                <td className="px-4 py-3">{new Date(d.createdAt).toLocaleDateString()}</td>
-                <td className="px-4 py-3">{STATUS_LABEL[d.status] ?? d.status}</td>
-                <td className="px-4 py-3">
-                  {d.integrityStatus === "FAILED" ? (
-                    <span className="pill-danger">Integrity failure, do not use</span>
-                  ) : (
-                    <span className="pill">Verified at last check</span>
-                  )}
-                </td>
+      <div className="card overflow-hidden p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-line bg-[#F7F9F6] text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+              <tr>
+                <th className="px-5 py-3">File</th>
+                <th className="px-5 py-3">Type</th>
+                <th className="px-5 py-3">Uploaded</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">File check</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {docs.length === 0 && <p className="p-4 text-sm text-muted">No documents yet.</p>}
+            </thead>
+            <tbody key={page} className="animate-fade-up divide-y divide-line">
+              {pagedDocs.map((d) => (
+                <tr key={d.id} className="transition-colors hover:bg-[#F9FAFB]">
+                  <td className="px-5 py-3.5">
+                    <Link
+                      href={`/documents/${d.id}`}
+                      className="font-medium text-ink transition-colors hover:text-brand hover:underline"
+                    >
+                      {d.fileName}
+                    </Link>
+                  </td>
+                  <td className="px-5 py-3.5 text-[#475467]">{d.docType ?? "—"}</td>
+                  <td className="px-5 py-3.5 font-mono text-xs tabular-nums text-[#475467]">
+                    {new Date(d.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-5 py-3.5 text-xs text-[#475467]">
+                    {STATUS_LABEL[d.status] ?? d.status}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {d.integrityStatus === "FAILED" ? (
+                      <span className="pill-danger">Needs replacement</span>
+                    ) : (
+                      <span className="pill-ok">Verified</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {docs.length === 0 && (
+          <p className="p-8 text-center text-xs text-muted">
+            No files uploaded for this property yet.
+          </p>
+        )}
+        <PaginationBar
+          page={page}
+          pageSize={DOCS_PAGE_SIZE}
+          totalItems={docs.length}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

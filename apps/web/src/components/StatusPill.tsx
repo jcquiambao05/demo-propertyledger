@@ -1,10 +1,28 @@
 import type { ParcelStatus } from "@/lib/types";
 
-// Color only where action is needed: amber for a returned record (Legal must correct it).
 export function StatusPill({ status }: { status: ParcelStatus }) {
-  if (status === "RETURNED") return <span className="pill-warning">Returned with remarks</span>;
-  if (status === "PENDING") return <span className="pill border border-dashed border-muted">Waiting for approval</span>;
-  return <span className="pill">Approved</span>;
+  if (status === "RETURNED") {
+    return (
+      <span className="pill-warning">
+        <span className="h-1.5 w-1.5 rounded-full bg-warning-dot" aria-hidden="true" />
+        Returned with remarks
+      </span>
+    );
+  }
+  if (status === "PENDING") {
+    return (
+      <span className="pill border-dashed border-[#D0D5DD]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#98A2B3]" aria-hidden="true" />
+        Waiting for approval
+      </span>
+    );
+  }
+  return (
+    <span className="pill-ok">
+      <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />
+      Approved
+    </span>
+  );
 }
 
 export const ACTION_LABEL: Record<string, string> = {

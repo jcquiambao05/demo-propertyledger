@@ -12,7 +12,13 @@ import { todayManila } from "../documents/document-types.js";
 interface MarkerRow {
   id: string;
   name: string;
+  region: string | null;
   province: string;
+  municipality: string | null;
+  title_no: string | null;
+  tax_dec_no: string | null;
+  classification: string | null;
+  area_ha: string | number;
   lat: number;
   lng: number;
   failed: boolean;
@@ -91,7 +97,8 @@ export function mapRouter(): Router {
       const filter = Prisma.sql`${visible ? Prisma.sql`AND p.id = ANY(${visible}::uuid[])` : Prisma.empty} ${filterSql(parsed)}`;
       const today = todayManila();
       const rows = await prisma.$queryRaw<MarkerRow[]>`
-        SELECT p.id::text AS id, p.name, p.province,
+        SELECT p.id::text AS id, p.name, p.region, p.province, p.municipality,
+               p.title_no, p.tax_dec_no, p.classification, p.area_ha,
                ST_Y(p.location) AS lat, ST_X(p.location) AS lng,
                EXISTS (SELECT 1 FROM documents d
                        WHERE d.parcel_id = p.id AND d.integrity_status = 'FAILED'
@@ -112,7 +119,13 @@ export function mapRouter(): Router {
         rows.map((m) => ({
           id: m.id,
           name: m.name,
+          region: m.region,
           province: m.province,
+          municipality: m.municipality,
+          titleNo: m.title_no,
+          taxDecNo: m.tax_dec_no,
+          classification: m.classification,
+          areaHa: Number(m.area_ha),
           lat: m.lat,
           lng: m.lng,
           problem: m.failed
@@ -147,7 +160,13 @@ export function mapRouter(): Router {
         regions: distinct(rows.map((x) => x.region)),
         provinces: distinct(rows.map((x) => x.province)),
         municipalities: distinct(rows.map((x) => x.municipality)),
-        parcels: rows.map((x) => ({ id: x.id, name: x.name })),
+        parcels: rows.map((x) => ({
+          id: x.id,
+          name: x.name,
+          region: x.region,
+          province: x.province,
+          municipality: x.municipality,
+        })),
       });
     }),
   );

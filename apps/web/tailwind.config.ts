@@ -1,23 +1,56 @@
 import type { Config } from "tailwindcss";
 
-// Design tokens: docs/demo/DEMO_PAGES.md §1 (light theme; IT uses the dark-blue set).
 const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
+      },
       colors: {
-        page: "#F6F7F9",
+        // Natural Limestone & Forest palette matched to the Eagle Cement facility photo
+        page: "#F4F6F3",
         surface: "#FFFFFF",
-        line: "#E4E7EB",
-        ink: "#1F2933",
-        muted: "#6B7280",
-        brand: { DEFAULT: "#1F5C3B", soft: "#EEF4F0" },
-        danger: { DEFAULT: "#B42318", bg: "#FEF3F2", dot: "#D92D20" },
-        warning: { DEFAULT: "#B54708", bg: "#FFFAEB", dot: "#DC8A0E" },
-        it: { page: "#0F1B2D", surface: "#13223A", line: "#22344F", text: "#DCE4EF", muted: "#8EA0BA", accent: "#3D6FD8", ok: "#7BD3A8", okbg: "#14342B", bad: "#F4A39A", badbg: "#3A1D22" },
+        line: "#DCE3DC",
+        ink: "#121D17",
+        muted: "#56685E",
+        brand: {
+          DEFAULT: "#1A472A",
+          accent: "#76B82A",
+          soft: "#EAF2EC",
+          border: "#B7D3BF",
+          hover: "#13361F",
+        },
+        danger: {
+          DEFAULT: "#B42318",
+          bg: "#FEF3F2",
+          dot: "#D92D20",
+          border: "#FECDCA",
+        },
+        warning: {
+          DEFAULT: "#B54708",
+          bg: "#FFFAEB",
+          dot: "#DC8A0E",
+          border: "#FEDF89",
+        },
+        // Unified Limestone & Forest Light Mode tokens for IT Administrator surfaces
+        it: {
+          page: "#F4F6F3",
+          surface: "#FFFFFF",
+          line: "#DCE3DC",
+          text: "#121D17",
+          muted: "#56685E",
+          accent: "#1A472A",
+          ok: "#1A472A",
+          okbg: "#EAF2EC",
+          bad: "#B42318",
+          badbg: "#FEF3F2",
+        },
       },
     },
   },
   plugins: [],
 };
+
 export default config;

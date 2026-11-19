@@ -1,13 +1,12 @@
 "use client";
-// Figure 24 (V17 Document viewer) and Figure 25 (V18 Integrity failure). FR-12:
-// every view and every download re-hashes the stored file on the server first.
-// FR-10 replace (new version, D2) and soft delete (D3): Legal Department only.
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { api } from "@/lib/api";
 import { CustodyPanel } from "@/components/CustodyPanel";
+import { ConfirmModal } from "@/components/ConfirmModal";
 
 interface Meta {
   id: string;
@@ -28,8 +27,6 @@ interface Version {
   integrityStatus: "VERIFIED" | "FAILED";
   createdAt: string;
 }
-
-const DELETE_CONFIRM = "This removes the document from the property. The action is recorded.";
 
 interface Failure {
   storedHash: string;
@@ -56,6 +53,7 @@ export default function DocumentViewer() {
   const [versions, setVersions] = useState<Version[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [newExpiry, setNewExpiry] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { data: session } = useSession();
   const isLegal = session?.user.role === "LEGAL";
 
@@ -120,7 +118,8 @@ export default function DocumentViewer() {
   }
 
   async function onDelete() {
-    if (!meta || !window.confirm(DELETE_CONFIRM)) return;
+    if (!meta) return;
+    setConfirmDelete(false);
     setBusy(true);
     try {
       await api(`/documents/${id}`, { method: "DELETE" });
@@ -134,31 +133,42 @@ export default function DocumentViewer() {
   const current = meta && meta.status !== "SUPERSEDED";
 
   return (
-    <div className="max-w-5xl space-y-4">
-      {meta && (
-        <Link
-          href={`/properties/${meta.parcel.id}/documents`}
-          className="text-sm text-brand hover:underline"
-        >
-          ← {meta.parcel.name} documents
-        </Link>
-      )}
-      <h1 className="text-2xl font-semibold">{meta?.fileName ?? "Document"}</h1>
-      {meta?.expiresOn && <p className="text-sm text-muted">Expires on {meta.expiresOn}</p>}
-      {meta && !current && (
-        <p className="text-sm text-muted">
-          This is an older version (version {meta.version}). It was replaced by a newer upload.
-        </p>
-      )}
+    <div className="w-full space-y-5">
+      <div className="border-b border-line pb-5">
+        {meta && (
+          <Link
+            href={`/properties/${meta.parcel.id}/documents`}
+            className="text-xs font-medium text-brand hover:underline"
+          >
+            ← {meta.parcel.name} documents
+          </Link>
+        )}
+        <h1 className="mt-1.5 text-xl font-semibold tracking-[-0.02em] text-ink">
+          {meta?.fileName ?? "Document"}
+        </h1>
+        {meta?.expiresOn && (
+          <p className="mt-1 font-mono text-xs text-muted">Expires on {meta.expiresOn}</p>
+        )}
+        {meta && !current && (
+          <p className="mt-1 text-xs text-muted">
+            This is an older version (version {meta.version}). It was replaced by a newer upload.
+          </p>
+        )}
+      </div>
+
       {error && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="rounded-lg border border-danger-border bg-danger-bg px-3.5 py-2.5 text-xs text-danger">
           {error}
         </p>
       )}
 
       {meta && (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <button type="button" onClick={toggleVersions} className="text-brand hover:underline">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <button
+            type="button"
+            onClick={toggleVersions}
+            className="font-medium text-brand hover:underline"
+          >
             {versions ? "Hide versions" : `Show versions (current: version ${meta.version})`}
           </button>
           {isLegal && current && (
@@ -170,7 +180,7 @@ export default function DocumentViewer() {
                     type="date"
                     value={newExpiry}
                     onChange={(e) => setNewExpiry(e.target.value)}
-                    className="field w-auto"
+                    className="field w-auto font-mono"
                   />
                 </label>
               )}
@@ -180,16 +190,15 @@ export default function DocumentViewer() {
                   type="file"
                   accept="application/pdf"
                   className="sr-only"
-                  // A renewed time-bound document needs its new expiry date first (D10).
                   disabled={busy || (!!meta.expiresOn && !newExpiry)}
                   onChange={onReplace}
                 />
               </label>
               <button
                 type="button"
-                onClick={onDelete}
+                onClick={() => setConfirmDelete(true)}
                 disabled={busy}
-                className="text-danger hover:underline"
+                className="font-medium text-danger hover:underline"
               >
                 Delete
               </button>
@@ -198,15 +207,29 @@ export default function DocumentViewer() {
         </div>
       )}
 
+      <ConfirmModal
+        open={confirmDelete}
+        title="Remove this document?"
+        description="It will be removed from this property's active files."
+        confirmLabel="Remove"
+        cancelLabel="Keep file"
+        variant="danger"
+        busy={busy}
+        onConfirm={onDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+
       {versions && (
-        <ul className="card divide-y divide-line p-0 text-sm">
+        <ul className="animate-fade-up card divide-y divide-line overflow-hidden p-0 text-sm">
           {versions.map((v) => (
-            <li key={v.id} className="flex flex-wrap items-center gap-3 px-4 py-2">
+            <li key={v.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
               <Link href={`/documents/${v.id}`} className="font-medium text-brand hover:underline">
                 Version {v.version}
               </Link>
-              <span className="text-muted">{new Date(v.createdAt).toLocaleDateString()}</span>
-              <span className="text-muted">
+              <span className="font-mono text-xs tabular-nums text-muted">
+                {new Date(v.createdAt).toLocaleDateString()}
+              </span>
+              <span className="text-xs text-muted">
                 {v.status === "SUPERSEDED" ? "Replaced" : "Current"}
               </span>
               {v.integrityStatus === "FAILED" && (
@@ -220,9 +243,9 @@ export default function DocumentViewer() {
       {meta && <CustodyPanel documentId={meta.id} canEdit={isLegal} />}
 
       {failure && (
-        <div className="space-y-3 rounded-xl border border-danger-dot bg-danger-bg p-6 text-sm text-danger">
-          <p className="text-lg font-semibold">Integrity failure — do not use this file</p>
-          <p>
+        <div className="space-y-3 rounded-xl border border-danger-border bg-danger-bg p-6 text-sm text-danger">
+          <p className="text-base font-semibold">Integrity failure — do not use this file</p>
+          <p className="text-xs leading-relaxed">
             This file changed after it was uploaded, or it is missing. Viewing and downloading are
             blocked, and the event was recorded in the audit log.
           </p>
@@ -232,7 +255,7 @@ export default function DocumentViewer() {
             <dt className="mt-2 font-sans font-medium">Computed hash (now)</dt>
             <dd className="break-all">{failure.computedHash ?? "file missing"}</dd>
           </dl>
-          <p className="text-ink">
+          <p className="text-xs text-ink">
             Next steps: get a verified copy of the original, then upload it as a replacement.
           </p>
         </div>
@@ -254,7 +277,7 @@ export default function DocumentViewer() {
           <iframe
             src={url}
             title={meta?.fileName ?? "Document"}
-            className="h-[70vh] w-full rounded-xl border border-line bg-surface"
+            className="h-[70vh] w-full rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
           />
         </>
       )}

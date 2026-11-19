@@ -86,9 +86,7 @@ export const authOptions: NextAuthOptions = {
 export function homeFor(role: Role | undefined): string {
   switch (role) {
     case "LEGAL":
-      return "/properties";
     case "MANAGEMENT":
-      return "/approvals";
     case "TENANT":
       return "/map";
     case "IT_ADMIN":

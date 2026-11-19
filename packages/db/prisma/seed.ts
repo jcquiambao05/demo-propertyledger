@@ -23,7 +23,10 @@ const USERS: { email: string; name: string; role: Role; locked?: boolean }[] = [
 
 const PARCELS: {
   name: string;
+  region: string;
   province: string;
+  municipality: string;
+  classification: string;
   titleNo?: string;
   taxDecNo?: string;
   areaHa: string;
@@ -33,7 +36,10 @@ const PARCELS: {
 }[] = [
   {
     name: "Iligan Plant Site Lot 7",
+    region: "Region X (Northern Mindanao)",
     province: "Lanao del Norte",
+    municipality: "Iligan City",
+    classification: "TITLED",
     titleNo: "TCT T-112-2016-0457",
     areaHa: "6.80",
     lat: 8.23,
@@ -42,7 +48,10 @@ const PARCELS: {
   },
   {
     name: "Teresa Plant Buffer Lot 3",
+    region: "Region IV-A (CALABARZON)",
     province: "Rizal",
+    municipality: "Teresa",
+    classification: "TITLED",
     titleNo: "TCT T-077-2019-0221",
     areaHa: "2.15",
     lat: 14.56,
@@ -51,7 +60,10 @@ const PARCELS: {
   },
   {
     name: "Norzagaray Quarry Parcel A",
+    region: "Region III (Central Luzon)",
     province: "Bulacan",
+    municipality: "Norzagaray",
+    classification: "TITLED",
     titleNo: "TCT T-041-2018-0012",
     taxDecNo: "TD 03-0412-00921",
     areaHa: "4.25",
@@ -61,7 +73,10 @@ const PARCELS: {
   },
   {
     name: "Bacnotan Plant Access Road",
+    region: "Region I (Ilocos Region)",
     province: "La Union",
+    municipality: "Bacnotan",
+    classification: "TITLED",
     titleNo: "TCT T-019-2017-0094",
     areaHa: "0.90",
     lat: 16.72,
@@ -70,7 +85,10 @@ const PARCELS: {
   },
   {
     name: "Antipolo Buffer Zone Lot 2",
+    region: "Region IV-A (CALABARZON)",
     province: "Rizal",
+    municipality: "Antipolo City",
+    classification: "TITLED",
     titleNo: "TCT T-077-2020-0310",
     areaHa: "1.40",
     lat: 14.59,
@@ -79,7 +97,10 @@ const PARCELS: {
   },
   {
     name: "Bulacan Depot Lot 5",
+    region: "Region III (Central Luzon)",
     province: "Bulacan",
+    municipality: "San Ildefonso",
+    classification: "TITLED",
     titleNo: "TCT T-041-2021-0188",
     areaHa: "0.75",
     lat: 14.81,
@@ -88,7 +109,10 @@ const PARCELS: {
   },
   {
     name: "Danao Warehouse Lot",
+    region: "Region VII (Central Visayas)",
     province: "Cebu",
+    municipality: "Danao City",
+    classification: "UNTITLED",
     taxDecNo: "TD 08-0412-00317",
     areaHa: "1.10",
     lat: 10.52,
@@ -97,7 +121,10 @@ const PARCELS: {
   },
   {
     name: "Davao Terminal Lot",
+    region: "Region XI (Davao Region)",
     province: "Davao del Sur",
+    municipality: "Davao City",
+    classification: "TITLED",
     titleNo: "TCT T-203-2026-0019",
     areaHa: "3.30",
     lat: 7.19,
@@ -142,7 +169,10 @@ async function main() {
     const existing = await prisma.parcel.findFirst({ where: { name: p.name } });
     const data = {
       name: p.name,
+      region: p.region,
       province: p.province,
+      municipality: p.municipality,
+      classification: p.classification,
       titleNo: p.titleNo ?? null,
       taxDecNo: p.taxDecNo ?? null,
       areaHa: p.areaHa,

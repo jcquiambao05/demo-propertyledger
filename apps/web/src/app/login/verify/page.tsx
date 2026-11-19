@@ -1,10 +1,9 @@
 "use client";
-// Figure 9 (V02 MFA) and Figure 10 (V03 MFA setup at first sign-in). FR-02.
-// Design copied from the demo prototype; the code is checked by the API through NextAuth.
+
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { APP_NAME, ORG_NAME } from "@/lib/branding";
+import { AuthShell } from "@/components/AuthShell";
 
 interface Challenge {
   mfaToken: string;
@@ -36,7 +35,7 @@ export default function VerifyPage() {
     const res = await signIn("mfa", { mfaToken: challenge.mfaToken, code, redirect: false });
     setBusy(false);
     if (!res || res.error) {
-      setError("That code is not correct or has expired. Check the code and try again.");
+      setError("That code is incorrect or has expired. Try again.");
       setDigits(Array(6).fill(""));
       refs.current[0]?.focus();
       return;
@@ -48,7 +47,6 @@ export default function VerifyPage() {
   function setAt(i: number, v: string) {
     const d = v.replace(/\D/g, "");
     if (!d) return;
-    // A paste or autofill can carry all six digits.
     const next = [...digits];
     d.slice(0, 6 - i)
       .split("")
@@ -76,81 +74,106 @@ export default function VerifyPage() {
   const setup = challenge.mfaSetup;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md rounded-xl bg-surface p-8 shadow-lg">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">
-            EP
-          </span>
-          <p className="text-sm font-semibold">{APP_NAME}</p>
+    <AuthShell>
+      <div className="w-full max-w-[380px]">
+        <div className="text-center">
+          <h1 className="text-[32px] font-semibold tracking-[-0.025em] text-white sm:text-[34px]">
+            {setup ? "Authenticator setup" : "Verification"}
+          </h1>
+          <p className="mt-2 text-sm font-normal text-white/60">
+            {setup
+              ? "Add the setup key below, then enter the 6-digit code."
+              : "Enter the 6-digit code from your authenticator app."}
+          </p>
         </div>
-        <h1 className="mt-6 text-2xl font-bold">
-          {setup ? "Set up your authenticator app" : "Enter your verification code"}
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          {setup
-            ? "Add this account to your authenticator app with the setup key below, then type the 6-digit code."
-            : "Open your authenticator app and type the 6-digit code."}
-        </p>
 
         {setup && (
-          <div className="mt-4 rounded-md bg-page px-3 py-2">
-            <p className="text-xs text-muted">Setup key (shown once, do not share)</p>
-            <p className="mt-1 break-all font-mono text-sm">{setup.secret}</p>
+          <div className="mt-7 rounded-[6px] border border-white/[0.12] bg-white/[0.05] px-4 py-3">
+            <p className="text-[11px] font-medium tracking-[0.02em] text-white/55">
+              Setup key (shown once)
+            </p>
+            <p className="mt-1.5 break-all font-mono text-xs tracking-wider text-white/95">
+              {setup.secret}
+            </p>
           </div>
         )}
 
-        <div className="mt-6 flex justify-between gap-2" role="group" aria-label="6-digit code">
-          {digits.map((d, i) => (
-            <input
-              key={i}
-              ref={(el) => {
-                refs.current[i] = el;
-              }}
-              value={d}
-              inputMode="numeric"
-              autoComplete={i === 0 ? "one-time-code" : "off"}
-              aria-label={`Digit ${i + 1}`}
-              maxLength={6}
-              autoFocus={i === 0}
-              onChange={(e) => setAt(i, e.target.value)}
-              onKeyDown={(e) => onKey(i, e)}
-              className="h-12 w-12 rounded-md border border-line bg-surface text-center text-lg font-semibold focus:border-brand focus:outline-none"
-            />
-          ))}
-        </div>
-
         {error && (
-          <p role="alert" className="mt-4 rounded-md bg-danger-bg px-3 py-2 text-sm text-danger">
+          <p
+            role="alert"
+            className="mt-6 rounded-[6px] border border-red-400/25 bg-red-500/10 px-3.5 py-2.5 text-center text-xs leading-relaxed text-red-100"
+          >
             {error}
           </p>
         )}
+
         {notice && (
-          <p role="status" className="mt-4 rounded-md bg-page px-3 py-2 text-sm text-ink">
+          <p
+            role="status"
+            className="mt-6 rounded-[6px] border border-white/15 bg-white/[0.06] px-3.5 py-2.5 text-center text-xs leading-relaxed text-white/85"
+          >
             {notice}
           </p>
         )}
 
-        <button
-          type="button"
-          onClick={() => void verify(digits.join(""))}
-          disabled={!digits.every(Boolean) || busy}
-          className="mt-6 w-full rounded-md bg-brand px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void verify(digits.join(""));
+          }}
+          className="mt-10"
         >
-          {busy ? "Checking…" : "Verify"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setNotice("Email codes are not available yet. Use your authenticator app.")}
-          className="mt-3 text-sm font-medium text-brand"
-        >
-          Send a code to my email instead
-        </button>
-        <button type="button" onClick={() => router.replace("/login")} className="mt-3 block text-sm text-muted">
-          Back to sign in
-        </button>
+          <div className="grid grid-cols-6 gap-3" role="group" aria-label="6-digit verification code">
+            {digits.map((d, i) => (
+              <input
+                key={i}
+                ref={(el) => {
+                  refs.current[i] = el;
+                }}
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                autoFocus={i === 0}
+                value={d}
+                onChange={(e) => setAt(i, e.target.value)}
+                onKeyDown={(e) => onKey(i, e)}
+                aria-label={`Digit ${i + 1}`}
+                className="h-12 w-full border-0 border-b border-white/30 bg-transparent text-center font-mono text-xl font-normal tabular-nums text-white transition-colors duration-200 focus:border-white focus:outline-none"
+              />
+            ))}
+          </div>
+
+          <button
+            type="submit"
+            disabled={busy || digits.some((d) => !d)}
+            className="mt-8 w-full rounded-[6px] bg-[#040706] px-6 py-3.5 text-sm font-semibold tracking-[0.005em] text-white shadow-[0_14px_30px_-8px_rgba(0,0,0,0.6)] ring-1 ring-white/[0.06] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-[#0b110f] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
+          >
+            {busy ? "Verifying…" : "Verify"}
+          </button>
+        </form>
+
+        <div className="mt-6 flex items-center justify-between text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              sessionStorage.removeItem("epl.mfa");
+              router.replace("/login");
+            }}
+            className="font-normal text-white/65 transition-colors duration-200 hover:text-white"
+          >
+            Back to sign in
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setNotice("If you lost access to your authenticator app, contact your IT Administrator.")
+            }
+            className="font-medium text-white/80 transition-colors duration-200 hover:text-white hover:underline"
+          >
+            Need help?
+          </button>
+        </div>
       </div>
-      <p className="mt-6 text-xs text-muted">© 2026 {ORG_NAME}. For internal use only.</p>
-    </div>
+    </AuthShell>
   );
 }

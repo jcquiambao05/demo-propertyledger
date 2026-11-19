@@ -1,72 +1,36 @@
-// App shell: sidebar per role (CLAUDE.md UI conventions, DEMO_PAGES §4). Navigation is
-// convenience only; the API refuses anything the role may not do.
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { authOptions, type Role } from "@/lib/auth";
+import { authOptions } from "@/lib/auth";
+import { AppSidebar } from "@/components/AppSidebar";
+import { CommandPalette } from "@/components/CommandPalette";
 import { Providers } from "./providers";
-import { SignOutButton } from "./sign-out";
-
-const NAV: Record<Role, { href: string; label: string }[]> = {
-  LEGAL: [
-    { href: "/map", label: "Map" },
-    { href: "/properties", label: "Properties" },
-    { href: "/due-dates", label: "Due dates" },
-  ],
-  MANAGEMENT: [
-    { href: "/map", label: "Map" },
-    { href: "/approvals", label: "Approvals" },
-    { href: "/properties", label: "Properties" },
-    { href: "/due-dates", label: "Due dates" },
-  ],
-  TENANT: [{ href: "/map", label: "My properties" }],
-  IT_ADMIN: [
-    { href: "/admin/users", label: "Users" },
-    { href: "/admin/audit", label: "Audit log" },
-  ],
-};
-
-const ROLE_LABEL: Record<Role, string> = {
-  LEGAL: "Legal Department",
-  MANAGEMENT: "Management",
-  TENANT: "Tenant",
-  IT_ADMIN: "IT Administrator",
-};
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.role) redirect("/login");
   const role = session.user.role;
-  const it = role === "IT_ADMIN";
 
   return (
     <Providers>
-      <div className={`flex min-h-screen ${it ? "bg-it-page text-it-text" : ""}`}>
-        <aside
-          className={`w-56 shrink-0 border-r p-4 ${it ? "border-it-line bg-it-surface" : "border-line bg-surface"}`}
-        >
-          <p className="text-sm font-semibold">
-            {process.env.NEXT_PUBLIC_APP_NAME ?? "Eagle Property Ledger"}
-          </p>
-          <p className={`mt-1 text-xs ${it ? "text-it-muted" : "text-muted"}`}>
-            {session.user.name} · {ROLE_LABEL[role]}
-          </p>
-          <nav className="mt-6 space-y-1">
-            {NAV[role].map((n) => (
-              <Link
-                key={n.href}
-                href={n.href}
-                className={`block rounded-lg px-3 py-2 text-sm ${it ? "hover:bg-it-line" : "hover:bg-brand-soft"}`}
-              >
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="mt-8">
-            <SignOutButton />
-          </div>
-        </aside>
-        <main className="flex-1 p-8">{children}</main>
+      <div className="relative flex min-h-[100dvh] bg-page text-ink">
+        {/* Architectural Survey Micro-Grid + Ambient Forest-Sage Glow */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-0 bg-survey-grid opacity-80"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_85%_12%,rgba(118,184,42,0.07),transparent_42%),radial-gradient(circle_at_18%_88%,rgba(26,71,42,0.06),transparent_48%)]"
+        />
+
+        <AppSidebar userName={session.user.name || "Authorized User"} role={role} />
+        <CommandPalette role={role} />
+
+        <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+          <main className="mx-auto w-full max-w-[1440px] flex-1 px-5 py-5 sm:px-7 sm:py-6">
+            {children}
+          </main>
+        </div>
       </div>
     </Providers>
   );
