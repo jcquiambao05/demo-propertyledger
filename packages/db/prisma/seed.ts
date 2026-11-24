@@ -7,18 +7,44 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-const USERS: { email: string; name: string; role: Role; locked?: boolean }[] = [
-  { email: "juan.ramos@xcement.example", name: "Atty. Juan Ramos", role: Role.LEGAL },
-  { email: "rico.lim@xcement.example", name: "Rico Lim", role: Role.LEGAL },
-  { email: "maria.santos@xcement.example", name: "Maria Santos", role: Role.MANAGEMENT },
+const USERS: { email: string; name: string; position: string; role: Role; locked?: boolean }[] = [
+  {
+    email: "juan.ramos@xcement.example",
+    name: "Atty. Juan Ramos",
+    position: "Senior Legal Counsel",
+    role: Role.LEGAL,
+  },
+  {
+    email: "rico.lim@xcement.example",
+    name: "Rico Lim",
+    position: "Land Title & Compliance Officer",
+    role: Role.LEGAL,
+  },
+  {
+    email: "maria.santos@xcement.example",
+    name: "Maria Santos",
+    position: "VP, Corporate Operations",
+    role: Role.MANAGEMENT,
+  },
   {
     email: "paolo.reyes@xcement.example",
     name: "Paolo Reyes",
+    position: "Director of Asset Management",
     role: Role.MANAGEMENT,
     locked: true,
   },
-  { email: "lito.cruz@xcement.example", name: "Lito Cruz", role: Role.TENANT },
-  { email: "ana.dizon@xcement.example", name: "Ana Dizon", role: Role.IT_ADMIN },
+  {
+    email: "lito.cruz@xcement.example",
+    name: "Lito Cruz",
+    position: "Authorized Lessee Representative",
+    role: Role.TENANT,
+  },
+  {
+    email: "ana.dizon@xcement.example",
+    name: "Ana Dizon",
+    position: "Systems & Security Administrator",
+    role: Role.IT_ADMIN,
+  },
 ];
 
 const PARCELS: {
@@ -150,6 +176,7 @@ async function main() {
   for (const u of USERS) {
     const data = {
       name: u.name,
+      position: u.position,
       role: u.role,
       passwordHash,
       failedAttempts: u.locked ? 5 : 0,

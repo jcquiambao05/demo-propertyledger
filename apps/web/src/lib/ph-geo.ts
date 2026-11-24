@@ -1,5 +1,5 @@
 // Philippines geospatial constants, offline archipelago GeoJSON outline,
-// geodesic buffer ring generator, MapTiler PH geocoding, OSRM routing, and Open-Meteo telemetry.
+// geodesic buffer ring generator, MapTiler PH geocoding, and OSRM routing.
 
 import type { Feature, FeatureCollection, LineString, Polygon } from "geojson";
 
@@ -318,13 +318,55 @@ const LOCAL_PH_GAZETTEER: PhPlaceResult[] = [
 
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY;
 
+// Client-side in-memory + sessionStorage cache for external API responses
+const memoryCache = new Map<string, { ts: number; data: unknown }>();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function getCached<T>(key: string): T | null {
+  const mem = memoryCache.get(key);
+  if (mem && Date.now() - mem.ts < CACHE_TTL_MS) {
+    return mem.data as T;
+  }
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.sessionStorage.getItem(`epl:${key}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { ts: number; data: T };
+        if (Date.now() - parsed.ts < CACHE_TTL_MS) {
+          memoryCache.set(key, parsed);
+          return parsed.data;
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+  return null;
+}
+
+function setCached<T>(key: string, data: T): void {
+  const entry = { ts: Date.now(), data };
+  memoryCache.set(key, entry);
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.setItem(`epl:${key}`, JSON.stringify(entry));
+    } catch {
+      // Ignore quota errors
+    }
+  }
+}
+
 /**
  * Forward geocode Philippine places using MapTiler Geocoding API (country=ph),
- * with instant local gazetteer fallback.
+ * with instant local gazetteer fallback and client-side caching.
  */
 export async function searchPhPlaces(query: string): Promise<PhPlaceResult[]> {
   const q = query.trim();
   if (!q) return [];
+
+  const cacheKey = `geocode:${q.toLowerCase()}`;
+  const cached = getCached<PhPlaceResult[]>(cacheKey);
+  if (cached) return cached;
 
   const localMatches = LOCAL_PH_GAZETTEER.filter((p) =>
     p.label.toLowerCase().includes(q.toLowerCase()),
@@ -366,7 +408,9 @@ export async function searchPhPlaces(query: string): Promise<PhPlaceResult[]> {
           municipality: muni,
         };
       });
-    return apiResults.length > 0 ? apiResults : localMatches;
+    const finalResults = apiResults.length > 0 ? apiResults : localMatches;
+    setCached(cacheKey, finalResults);
+    return finalResults;
   } catch {
     return localMatches;
   }
@@ -457,6 +501,10 @@ export async function fetchOsrmRoute(
   from: { lat: number; lng: number },
   to: { lat: number; lng: number },
 ): Promise<RouteResult> {
+  const cacheKey = `route:${from.lat.toFixed(3)},${from.lng.toFixed(3)}->${to.lat.toFixed(3)},${to.lng.toFixed(3)}`;
+  const cached = getCached<RouteResult>(cacheKey);
+  if (cached) return cached;
+
   const straightKm = haversineKm(from, to);
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
@@ -472,7 +520,7 @@ export async function fetchOsrmRoute(
       };
       const route = data.routes?.[0];
       if (data.code === "Ok" && route) {
-        return {
+        const result: RouteResult = {
           distanceKm: Number((route.distance / 1000).toFixed(1)),
           durationMin: Math.max(1, Math.round(route.duration / 60)),
           mode: "road",
@@ -482,13 +530,15 @@ export async function fetchOsrmRoute(
             geometry: route.geometry,
           },
         };
+        setCached(cacheKey, result);
+        return result;
       }
     }
   } catch {
     // Fall back to geodesic line
   }
 
-  return {
+  const fallback: RouteResult = {
     distanceKm: Number(straightKm.toFixed(1)),
     durationMin: Math.max(5, Math.round((straightKm / 45) * 60)),
     mode: "inter-island",
@@ -504,55 +554,62 @@ export async function fetchOsrmRoute(
       },
     },
   };
+  // Do not cache offline/transient fallback so reconnecting fetches the real road route
+  return fallback;
 }
 
-export interface SiteWeather {
-  tempC: number;
-  rainMm: number;
-  windKmh: number;
-  condition: string;
-}
-
-function weatherCodeLabel(code: number): string {
-  if (code === 0) return "Clear sky";
-  if (code <= 3) return "Partly cloudy";
-  if (code <= 48) return "Hazy / Mist";
-  if (code <= 67) return "Light rain";
-  if (code <= 82) return "Heavy showers";
-  return "Thunderstorm";
+export interface DrawPoint {
+  lat: number;
+  lng: number;
 }
 
 /**
- * Fetches live site weather from Open-Meteo (no API key required).
+ * Computes total path distance in kilometers for an array of points.
  */
-export async function fetchOpenMeteoWeather(
-  lat: number,
-  lng: number,
-): Promise<SiteWeather | null> {
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(
-      4,
-    )}&longitude=${lng.toFixed(
-      4,
-    )}&current=temperature_2m,precipitation,weather_code,wind_speed_10m&timezone=Asia%2FManila`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      current?: {
-        temperature_2m?: number;
-        precipitation?: number;
-        weather_code?: number;
-        wind_speed_10m?: number;
-      };
-    };
-    if (!data.current || typeof data.current.temperature_2m !== "number") return null;
-    return {
-      tempC: Number(data.current.temperature_2m.toFixed(1)),
-      rainMm: Number((data.current.precipitation ?? 0).toFixed(1)),
-      windKmh: Number((data.current.wind_speed_10m ?? 0).toFixed(1)),
-      condition: weatherCodeLabel(data.current.weather_code ?? 1),
-    };
-  } catch {
-    return null;
+export function computePathDistanceKm(points: DrawPoint[], closeLoop = false): number {
+  if (points.length < 2) return 0;
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += haversineKm(points[i - 1], points[i]);
   }
+  if (closeLoop && points.length >= 3) {
+    total += haversineKm(points[points.length - 1], points[0]);
+  }
+  return Number(total.toFixed(3));
+}
+
+/**
+ * Computes geodesic polygon area in Hectares (ha) and Square Meters (m²)
+ * using local equirectangular metric projection around the polygon centroid.
+ */
+export function computePolygonMetrics(points: DrawPoint[]): {
+  areaHa: number;
+  areaSqm: number;
+  perimeterKm: number;
+} {
+  const perimeterKm = computePathDistanceKm(points, true);
+  if (points.length < 3) {
+    return { areaHa: 0, areaSqm: 0, perimeterKm };
+  }
+
+  const meanLatRad =
+    (points.reduce((s, p) => s + p.lat, 0) / points.length) * (Math.PI / 180);
+  const metersPerDegLat = 111132.92;
+  const metersPerDegLng = 111412.84 * Math.cos(meanLatRad);
+
+  const origin = points[0];
+  let twiceArea = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % points.length];
+    const x1 = (p1.lng - origin.lng) * metersPerDegLng;
+    const y1 = (p1.lat - origin.lat) * metersPerDegLat;
+    const x2 = (p2.lng - origin.lng) * metersPerDegLng;
+    const y2 = (p2.lat - origin.lat) * metersPerDegLat;
+    twiceArea += x1 * y2 - x2 * y1;
+  }
+
+  const areaSqm = Math.round(Math.abs(twiceArea) / 2);
+  const areaHa = Number((areaSqm / 10000).toFixed(2));
+  return { areaHa, areaSqm, perimeterKm };
 }

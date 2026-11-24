@@ -11,6 +11,7 @@ import { issuesRouter } from "./issues/routes.js";
 import { usersRouter } from "./users/routes.js";
 import { stepUpRouter } from "./users/step-up.js";
 import { auditAdminRouter } from "./audit/admin.js";
+import { profileRouter } from "./profile/routes.js";
 
 export function createApp() {
   const app = express();
@@ -36,6 +37,7 @@ export function createApp() {
   app.use(issuesRouter());
   app.use(stepUpRouter());
   app.use(usersRouter());
+  app.use(profileRouter());
   app.use(auditAdminRouter());
 
   app.use((_req, res) => {

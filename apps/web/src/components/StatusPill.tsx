@@ -2,37 +2,22 @@ import type { ParcelStatus } from "@/lib/types";
 
 export function StatusPill({ status }: { status: ParcelStatus }) {
   if (status === "RETURNED") {
-    return (
-      <span className="pill-warning">
-        <span className="h-1.5 w-1.5 rounded-full bg-warning-dot" aria-hidden="true" />
-        Returned with remarks
-      </span>
-    );
+    return <span className="pill-warning">Returned for changes</span>;
   }
   if (status === "PENDING") {
-    return (
-      <span className="pill border-dashed border-[#D0D5DD]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#98A2B3]" aria-hidden="true" />
-        Waiting for approval
-      </span>
-    );
+    return <span className="pill border-dashed border-line">Waiting for approval</span>;
   }
-  return (
-    <span className="pill-ok">
-      <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />
-      Approved
-    </span>
-  );
+  return <span className="pill-ok">Approved</span>;
 }
 
 export const ACTION_LABEL: Record<string, string> = {
-  PARCEL_SUBMITTED: "Submitted for approval",
+  PARCEL_SUBMITTED: "Sent for review",
   PARCEL_APPROVED: "Approved",
-  PARCEL_RETURNED: "Returned with remarks",
-  PARCEL_RESUBMITTED: "Corrected and resubmitted",
-  DOCUMENT_UPLOADED: "Document uploaded",
-  DOCUMENT_VIEWED: "Document viewed",
-  DOCUMENT_DOWNLOADED: "Document downloaded",
-  INTEGRITY_FAIL: "Integrity check failed",
-  ACCESS_DENIED: "Access refused",
+  PARCEL_RETURNED: "Returned for changes",
+  PARCEL_RESUBMITTED: "Updated and resent",
+  DOCUMENT_UPLOADED: "File uploaded",
+  DOCUMENT_VIEWED: "File viewed",
+  DOCUMENT_DOWNLOADED: "File downloaded",
+  INTEGRITY_FAIL: "File check failed",
+  ACCESS_DENIED: "Access blocked",
 };

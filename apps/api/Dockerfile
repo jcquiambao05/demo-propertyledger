@@ -5,6 +5,8 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/db/package.json packages/db/
 RUN npm ci --workspace api --include-workspace-root
+COPY packages/db packages/db
+RUN npx prisma generate --schema packages/db/prisma/schema.prisma
 COPY apps/api apps/api
 RUN npm run build --workspace api
 ENV NODE_ENV=production PORT=4000

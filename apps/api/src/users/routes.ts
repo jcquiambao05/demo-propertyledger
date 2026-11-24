@@ -2,7 +2,7 @@
 // docs/build/DECISIONS.md D13, STUDY_CONTEXT §3 guardrails and §8 settings 4, 5, 11, 12.
 // No super admin: the last active IT Administrator cannot be deactivated or demoted, and IT
 // cannot change their own role. Every IT write needs a recent MFA re-entry (step-up).
-import { Router, type Response } from "express";
+import { Router, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { Prisma, type Role } from "@prisma/client";
 import { prisma } from "../db.js";
@@ -12,6 +12,7 @@ import { readableParcel, UUID } from "../parcels/access.js";
 import { endAllSessions } from "../auth/sessions.js";
 import { requireStepUp } from "./step-up.js";
 import { isCommonPassword } from "./common-passwords.js";
+import { validatePasswordPolicy } from "../profile/password-policy.js";
 
 const ROLES: Role[] = ["LEGAL", "MANAGEMENT", "TENANT", "IT_ADMIN"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -22,6 +23,7 @@ const select = {
   id: true,
   email: true,
   name: true,
+  position: true,
   role: true,
   isActive: true,
   mfaEnabled: true,
@@ -37,10 +39,45 @@ function present(u: Listed, lastSignIn: Date | null = null) {
 }
 
 function passwordProblem(pw: unknown): string | null {
-  if (typeof pw !== "string" || pw.length < MIN_PASSWORD || pw.length > MAX_PASSWORD)
-    return `Use a password of ${MIN_PASSWORD} to ${MAX_PASSWORD} characters.`;
+  if (typeof pw !== "string" || pw.length < 8 || pw.length > MAX_PASSWORD) {
+    return "Password must be at least 8 characters (with uppercase, lowercase, number, and special character).";
+  }
   if (isCommonPassword(pw)) return "This password is too common. Choose another one.";
-  return null;
+  // Accept either the 8-char complexity policy OR a 15+ character passphrase
+  const policyErr = validatePasswordPolicy(pw);
+  if (!policyErr) return null;
+  if (pw.length >= MIN_PASSWORD) return null;
+  return policyErr;
+}
+
+/**
+ * Verifies admin authorization via the admin's own password (mandatory password confirmation
+ * modal in User Directory) or falls back to a recent MFA step-up session token.
+ */
+async function verifyAdminConfirmation(req: Request, res: Response): Promise<boolean> {
+  if (req.body && req.body.adminPassword !== undefined) {
+    const adminPw = typeof req.body.adminPassword === "string" ? req.body.adminPassword : "";
+    if (!adminPw) {
+      res.status(400).json({ error: "Enter your admin password to confirm this change." });
+      return false;
+    }
+    const me = currentUser(res);
+    const adminUser = await prisma.user.findUnique({
+      where: { id: me.id },
+      select: { id: true, passwordHash: true, lockedUntil: true },
+    });
+    if (!adminUser || (adminUser.lockedUntil && adminUser.lockedUntil > new Date())) {
+      res.status(423).json({ error: "This account is locked for 15 minutes." });
+      return false;
+    }
+    const ok = await bcrypt.compare(adminPw, adminUser.passwordHash);
+    if (!ok) {
+      res.status(401).json({ error: "Your admin password is incorrect." });
+      return false;
+    }
+    return true;
+  }
+  return requireStepUp(res);
 }
 
 async function audit(
@@ -115,9 +152,13 @@ export function usersRouter(): Router {
     "/admin/users",
     ["IT_ADMIN"],
     h(async (req, res) => {
-      if (!(await requireStepUp(res))) return;
+      if (!(await verifyAdminConfirmation(req, res))) return;
       const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
       const name = typeof req.body?.name === "string" ? req.body.name.trim().slice(0, 120) : "";
+      const position =
+        typeof req.body?.position === "string" && req.body.position.trim()
+          ? req.body.position.trim().slice(0, 120)
+          : null;
       const role = req.body?.role as Role;
       if (!EMAIL.test(email) || email.length > 200)
         return res.status(400).json({ error: "Enter a valid email address." });
@@ -130,7 +171,13 @@ export function usersRouter(): Router {
       try {
         const user = await prisma.$transaction(async (tx) => {
           const u = await tx.user.create({
-            data: { email, name, role, passwordHash: await bcrypt.hash(req.body.password, 12) },
+            data: {
+              email,
+              name,
+              position,
+              role,
+              passwordHash: await bcrypt.hash(req.body.password, 12),
+            },
             select,
           });
           await audit(me.id, "USER_CREATED", u.id, { role }, tx);
@@ -151,7 +198,7 @@ export function usersRouter(): Router {
     "/admin/users/:id",
     ["IT_ADMIN"],
     h(async (req, res) => {
-      if (!(await requireStepUp(res))) return;
+      if (!(await verifyAdminConfirmation(req, res))) return;
       const u = await target(res, req.params.id);
       if (!u) return;
       const me = currentUser(res);
@@ -159,7 +206,13 @@ export function usersRouter(): Router {
       if (req.body?.name !== undefined) {
         const name = typeof req.body.name === "string" ? req.body.name.trim().slice(0, 120) : "";
         if (!name) return res.status(400).json({ error: "Enter the person's name." });
-        data.name = name;
+        if (name !== u.name) data.name = name;
+      }
+      if (req.body?.position !== undefined) {
+        const pos =
+          typeof req.body.position === "string" ? req.body.position.trim().slice(0, 120) : "";
+        const nextPos = pos || null;
+        if (nextPos !== u.position) data.position = nextPos;
       }
       const role = req.body?.role as Role | undefined;
       if (role !== undefined && role !== u.role) {
@@ -169,6 +222,15 @@ export function usersRouter(): Router {
           return res.status(400).json({ error: "You cannot change your own role." });
         data.role = role;
       }
+      let passwordChanged = false;
+      if (req.body?.password !== undefined && String(req.body.password).length > 0) {
+        const policyErr = validatePasswordPolicy(req.body.password);
+        if (policyErr) return res.status(400).json({ error: policyErr });
+        data.passwordHash = await bcrypt.hash(req.body.password, 12);
+        data.failedAttempts = 0;
+        data.lockedUntil = null;
+        passwordChanged = true;
+      }
       if (Object.keys(data).length === 0)
         return res.status(400).json({ error: "Nothing to change." });
       const updated = await guarded(
@@ -177,12 +239,16 @@ export function usersRouter(): Router {
           const x = await tx.user.update({ where: { id: u.id }, data, select });
           if (data.role) await audit(me.id, "ROLE_CHANGED", u.id, { from: u.role, to: role! }, tx);
           if (data.name) await audit(me.id, "USER_UPDATED", u.id, { change: "NAME" }, tx);
+          if (data.position !== undefined)
+            await audit(me.id, "USER_UPDATED", u.id, { change: "POSITION" }, tx);
+          if (passwordChanged)
+            await audit(me.id, "USER_UPDATED", u.id, { change: "PASSWORD_RESET" }, tx);
           return x;
         }),
       );
       if (!updated) return res.status(409).json({ error: LAST_IT });
-      // A role change ends the user's sessions (review finding h); the API also re-checks the role.
-      if (data.role) await endAllSessions(u.id);
+      // A role change or password reset ends the user's sessions.
+      if (data.role || passwordChanged) await endAllSessions(u.id);
       res.json(present(updated));
     }),
   );
@@ -193,7 +259,7 @@ export function usersRouter(): Router {
     "/admin/users/:id/deactivate",
     ["IT_ADMIN"],
     h(async (req, res) => {
-      if (!(await requireStepUp(res))) return;
+      if (!(await verifyAdminConfirmation(req, res))) return;
       const u = await target(res, req.params.id);
       if (!u) return;
       if (!u.isActive) return res.status(409).json({ error: "This account is already inactive." });
@@ -228,7 +294,7 @@ export function usersRouter(): Router {
       path,
       ["IT_ADMIN"],
       h(async (req, res) => {
-        if (!(await requireStepUp(res))) return;
+        if (!(await verifyAdminConfirmation(req, res))) return;
         const u = await target(res, req.params.id);
         if (!u) return;
         const me = currentUser(res);

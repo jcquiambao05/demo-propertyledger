@@ -75,26 +75,27 @@ describe("sign-in with password and TOTP", () => {
     expect(wrong.body.error).toBe(unknown.body.error);
   });
 
-  it("locks the account for 15 minutes after 5 failed attempts", async () => {
+  it("locks the account for 30 seconds after 3 consecutive failed attempts", async () => {
     const u = await makeUser("LEGAL");
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 2; i++) {
       const r = await request(app)
         .post("/auth/login")
         .send({ email: u.email, password: "wrong-password" });
       expect(r.status).toBe(401);
     }
-    const fifth = await request(app)
+    const third = await request(app)
       .post("/auth/login")
       .send({ email: u.email, password: "wrong-password" });
-    expect(fifth.status).toBe(423);
+    expect(third.status).toBe(423);
+    expect(third.body.remainingSeconds).toBeLessThanOrEqual(30);
     const correct = await request(app)
       .post("/auth/login")
       .send({ email: u.email, password: TEST_PASSWORD });
     expect(correct.status).toBe(423);
     const stored = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
-    const minutes = (stored.lockedUntil!.getTime() - Date.now()) / 60000;
-    expect(minutes).toBeGreaterThan(14);
-    expect(minutes).toBeLessThanOrEqual(15);
+    const seconds = (stored.lockedUntil!.getTime() - Date.now()) / 1000;
+    expect(seconds).toBeGreaterThan(20);
+    expect(seconds).toBeLessThanOrEqual(30);
     expect(await lastAudit("ACCOUNT_LOCKED")).toMatchObject({ actorId: u.id });
   });
 });
@@ -155,10 +156,10 @@ describe("security review fixes", () => {
     expect(replay.status).toBe(401);
   });
 
-  it("locks after 5 parallel wrong passwords", async () => {
+  it("locks after 3 parallel wrong passwords", async () => {
     const u = await makeUser("LEGAL");
     await Promise.all(
-      Array.from({ length: 5 }, () =>
+      Array.from({ length: 3 }, () =>
         request(app).post("/auth/login").send({ email: u.email, password: "wrong-password" }),
       ),
     );
@@ -192,9 +193,9 @@ describe("reviewer findings", () => {
     expect((await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).totpSecretEnc).toBe(before);
   });
 
-  it("5 wrong MFA codes across challenges lock the account", async () => {
+  it("3 wrong MFA codes across challenges lock the account", async () => {
     const u = await makeUser("MANAGEMENT");
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       const s = await request(app).post("/auth/login").send({ email: u.email, password: TEST_PASSWORD });
       expect(s.status).toBe(200);
       await request(app).post("/auth/mfa/verify").send({ mfaToken: s.body.mfaToken, code: "000000" });

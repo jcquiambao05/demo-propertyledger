@@ -22,12 +22,12 @@ export function PaginationBar({
 
   if (compact) {
     return (
-      <div className="flex items-center justify-between border-t border-[#DCE3DC] pt-2.5 text-xs">
+      <div className="flex items-center justify-between border-t border-line pt-2.5 text-xs">
         <button
           type="button"
           disabled={safePage <= 1}
           onClick={() => onPageChange(safePage - 1)}
-          className="rounded-lg border border-[#DCE3DC] bg-white px-2.5 py-1 text-[11px] font-medium text-[#2A3B31] transition-colors hover:bg-[#F4F6F3] disabled:opacity-40 disabled:pointer-events-none"
+          className="btn-secondary px-2.5 py-1 text-[11px]"
         >
           ← Prev
         </button>
@@ -38,7 +38,7 @@ export function PaginationBar({
           type="button"
           disabled={safePage >= totalPages}
           onClick={() => onPageChange(safePage + 1)}
-          className="rounded-lg border border-[#DCE3DC] bg-white px-2.5 py-1 text-[11px] font-medium text-[#2A3B31] transition-colors hover:bg-[#F4F6F3] disabled:opacity-40 disabled:pointer-events-none"
+          className="btn-secondary px-2.5 py-1 text-[11px]"
         >
           Next →
         </button>
@@ -60,7 +60,7 @@ export function PaginationBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-[#F8FAF8] px-5 py-3 text-xs">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-muted px-5 py-3 text-xs">
       <span className="text-muted">
         Showing <span className="font-mono font-medium tabular-nums text-ink">{start}–{end}</span> of{" "}
         <span className="font-mono font-medium tabular-nums text-ink">{totalItems}</span>
@@ -71,7 +71,7 @@ export function PaginationBar({
           type="button"
           disabled={safePage <= 1}
           onClick={() => onPageChange(safePage - 1)}
-          className="rounded-lg border border-[#DCE3DC] bg-white px-2.5 py-1 text-xs font-medium text-[#2A3B31] transition-colors hover:bg-[#F4F6F3] disabled:opacity-40 disabled:pointer-events-none"
+          className="btn-secondary px-2.5 py-1 text-xs"
         >
           ← Previous
         </button>
@@ -89,8 +89,8 @@ export function PaginationBar({
               aria-current={p === safePage ? "page" : undefined}
               className={`h-7 min-w-[28px] rounded-lg px-2 font-mono text-xs font-medium tabular-nums transition-colors ${
                 p === safePage
-                  ? "bg-[#1A472A] text-white shadow-sm"
-                  : "border border-transparent text-muted hover:border-[#DCE3DC] hover:bg-white hover:text-ink"
+                  ? "bg-brand-fill text-brand-fg shadow-sm"
+                  : "border border-transparent text-muted hover:border-line hover:bg-surface hover:text-ink"
               }`}
             >
               {p}
@@ -102,7 +102,7 @@ export function PaginationBar({
           type="button"
           disabled={safePage >= totalPages}
           onClick={() => onPageChange(safePage + 1)}
-          className="rounded-lg border border-[#DCE3DC] bg-white px-2.5 py-1 text-xs font-medium text-[#2A3B31] transition-colors hover:bg-[#F4F6F3] disabled:opacity-40 disabled:pointer-events-none"
+          className="btn-secondary px-2.5 py-1 text-xs"
         >
           Next →
         </button>

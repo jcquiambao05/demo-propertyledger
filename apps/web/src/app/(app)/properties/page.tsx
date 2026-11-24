@@ -7,8 +7,9 @@ import { api } from "@/lib/api";
 import type { Parcel, ParcelStatus } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { PaginationBar } from "@/components/PaginationBar";
+import { formatAreaSqm } from "@/lib/area";
 
-type ViewMode = "table" | "bento";
+type ViewMode = "bento" | "table";
 type FilterStatus = "ALL" | ParcelStatus;
 
 export default function PropertiesPage() {
@@ -17,7 +18,8 @@ export default function PropertiesPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("ALL");
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  // Default Property Directory layout: Cards view ("bento") with toggle to Table view
+  const [viewMode, setViewMode] = useState<ViewMode>("bento");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -74,17 +76,14 @@ export default function PropertiesPage() {
       {/* Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#76B82A]" aria-hidden="true" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-brand">
-              Corporate Land Portfolio
-            </p>
-          </div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-brand">
+            Property Directory
+          </p>
           <h1 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink">
             Properties
           </h1>
           <p className="mt-0.5 text-xs text-muted">
-            All titled and untitled land parcels, survey areas, and current review status.
+            All titled and untitled land parcels, land areas, and current approval status.
           </p>
         </div>
 
@@ -95,7 +94,7 @@ export default function PropertiesPage() {
             className="btn-secondary"
           >
             <span>Quick jump</span>
-            <kbd className="rounded border border-[#DCE3DC] bg-[#F4F6F3] px-1.5 py-0.5 font-mono text-[10px]">
+            <kbd className="rounded border border-line bg-surface-muted px-1.5 py-0.5 font-mono text-[10px]">
               Ctrl K
             </kbd>
           </button>
@@ -123,9 +122,11 @@ export default function PropertiesPage() {
           <div className="bento-core p-4">
             <p className="text-xs font-medium text-muted">Total Land Area</p>
             <p className="mt-2 font-mono text-2xl font-semibold tabular-nums text-brand">
-              {parcels ? `${stats.totalHa.toFixed(2)} ha` : "—"}
+              {parcels ? formatAreaSqm(stats.totalHa) : "—"}
             </p>
-            <p className="mt-1 text-[11px] text-muted">Combined portfolio footprint</p>
+            <p className="mt-1 text-[11px] text-muted">
+              {parcels ? `${stats.totalHa.toFixed(2)} ha combined footprint` : "Combined portfolio footprint"}
+            </p>
           </div>
         </div>
 
@@ -165,7 +166,7 @@ export default function PropertiesPage() {
       <div className="bento-shell">
         <div className="bento-core overflow-hidden p-0">
           {/* Interactive Filter & View Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-[#F8FAF8] px-5 py-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-muted px-5 py-3.5">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative w-64 sm:w-72">
                 <input
@@ -174,11 +175,11 @@ export default function PropertiesPage() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search parcel, province, title no…"
                   aria-label="Search properties"
-                  className="w-full rounded-lg border border-[#C8D3C8] bg-white px-3 py-1.5 text-xs text-ink placeholder:text-[#84968B] focus:border-brand focus:outline-none"
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-muted focus:border-brand focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center gap-1 rounded-lg border border-[#DCE3DC] bg-white p-0.5">
+              <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-0.5">
                 {(
                   [
                     { id: "ALL", label: "All" },
@@ -193,7 +194,7 @@ export default function PropertiesPage() {
                     onClick={() => setStatusFilter(tab.id)}
                     className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                       statusFilter === tab.id
-                        ? "bg-[#1A472A] text-white"
+                        ? "bg-brand-fill text-brand-fg"
                         : "text-muted hover:text-ink"
                     }`}
                   >
@@ -203,33 +204,92 @@ export default function PropertiesPage() {
               </div>
             </div>
 
-            {/* Table vs Bento Grid View Switcher */}
-            <div className="flex items-center gap-1 rounded-lg border border-[#DCE3DC] bg-white p-0.5">
+            {/* Cards (Default) vs Table View Toggle Switch */}
+            <div
+              role="group"
+              aria-label="Directory layout view"
+              className="flex items-center gap-1 rounded-lg border border-line bg-surface p-0.5"
+            >
               <button
                 type="button"
-                onClick={() => setViewMode("table")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                  viewMode === "table" ? "bg-[#EAF2EC] text-[#1A472A]" : "text-muted hover:text-ink"
+                aria-pressed={viewMode === "bento"}
+                onClick={() => setViewMode("bento")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode === "bento"
+                    ? "bg-brand-soft text-brand-soft-fg font-semibold"
+                    : "text-muted hover:text-ink"
                 }`}
               >
-                Table
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                </svg>
+                <span>Cards</span>
               </button>
               <button
                 type="button"
-                onClick={() => setViewMode("bento")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                  viewMode === "bento" ? "bg-[#EAF2EC] text-[#1A472A]" : "text-muted hover:text-ink"
+                aria-pressed={viewMode === "table"}
+                onClick={() => setViewMode("table")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode === "table"
+                    ? "bg-brand-soft text-brand-soft-fg font-semibold"
+                    : "text-muted hover:text-ink"
                 }`}
               >
-                Cards
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+                <span>Table</span>
               </button>
             </div>
           </div>
 
-          {viewMode === "table" ? (
+          {viewMode === "bento" ? (
+            <div
+              key={`${page}-${statusFilter}-bento`}
+              className="animate-fade-up grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {paged?.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/properties/${p.id}`}
+                  className="group flex flex-col justify-between rounded-xl border border-line bg-surface p-4 transition-all hover:border-brand-border hover:bg-surface-muted hover:shadow-md"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <StatusPill status={p.status} />
+                      <span className="rounded bg-brand-soft px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-brand-soft-fg">
+                        {formatAreaSqm(p.areaHa)}
+                      </span>
+                    </div>
+                    <h2 className="mt-3 text-base font-semibold text-ink group-hover:text-brand">
+                      {p.name}
+                    </h2>
+                    <p className="mt-0.5 text-xs text-muted">
+                      {[p.municipality, p.province].filter(Boolean).join(", ")}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs">
+                    <span className="truncate font-mono text-[11px] text-muted">
+                      {p.titleNo || p.taxDecNo || "Untitled"}
+                    </span>
+                    <span className="font-medium text-brand">View →</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-line bg-[#F7F9F6] text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+                <thead className="border-b border-line bg-surface-muted text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
                   <tr>
                     <th className="px-5 py-3">Parcel Name</th>
                     <th className="px-5 py-3">Location</th>
@@ -241,7 +301,7 @@ export default function PropertiesPage() {
                 </thead>
                 <tbody key={`${page}-${statusFilter}`} className="animate-fade-up divide-y divide-line">
                   {paged?.map((p) => (
-                    <tr key={p.id} className="group transition-colors hover:bg-[#F8FAF8]">
+                    <tr key={p.id} className="group transition-colors hover:bg-surface-muted">
                       <td className="px-5 py-3.5">
                         <Link
                           href={`/properties/${p.id}`}
@@ -250,14 +310,14 @@ export default function PropertiesPage() {
                           {p.name}
                         </Link>
                       </td>
-                      <td className="px-5 py-3.5 text-xs text-[#3E5046]">
+                      <td className="px-5 py-3.5 text-xs text-muted">
                         {[p.municipality, p.province].filter(Boolean).join(", ")}
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-xs text-[#3E5046]">
+                      <td className="px-5 py-3.5 font-mono text-xs text-muted">
                         {[p.titleNo, p.taxDecNo].filter(Boolean).join(" · ") || "—"}
                       </td>
                       <td className="px-5 py-3.5 font-mono text-xs font-medium tabular-nums text-ink">
-                        {p.areaHa.toFixed(2)} ha
+                        {formatAreaSqm(p.areaHa, { includeHa: true })}
                       </td>
                       <td className="px-5 py-3.5">
                         <StatusPill status={p.status} />
@@ -274,41 +334,6 @@ export default function PropertiesPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
-          ) : (
-            <div
-              key={`${page}-${statusFilter}-bento`}
-              className="animate-fade-up grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3"
-            >
-              {paged?.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/properties/${p.id}`}
-                  className="group flex flex-col justify-between rounded-xl border border-[#DCE3DC] bg-[#FBFDFB] p-4 transition-all hover:border-[#1A472A] hover:bg-white hover:shadow-md"
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <StatusPill status={p.status} />
-                      <span className="rounded bg-[#EAF2EC] px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-[#1A472A]">
-                        {p.areaHa.toFixed(2)} ha
-                      </span>
-                    </div>
-                    <h2 className="mt-3 text-base font-semibold text-ink group-hover:text-brand">
-                      {p.name}
-                    </h2>
-                    <p className="mt-0.5 text-xs text-muted">
-                      {[p.municipality, p.province].filter(Boolean).join(", ")}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-[#DCE3DC] pt-3 text-xs">
-                    <span className="truncate font-mono text-[11px] text-[#56685E]">
-                      {p.titleNo || p.taxDecNo || "Untitled"}
-                    </span>
-                    <span className="font-medium text-brand">View →</span>
-                  </div>
-                </Link>
-              ))}
             </div>
           )}
 

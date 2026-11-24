@@ -49,18 +49,25 @@ enum DocumentStatus {
 }
 
 model User {
-  id             String    @id @default(uuid()) @db.Uuid
-  email          String    @unique
-  name           String
-  role           Role
-  passwordHash   String    @map("password_hash")
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String    @unique
+  name               String
+  position           String?   @db.VarChar(120)
+  role               Role
+  passwordHash       String    @map("password_hash")
   // TOTP secret, encrypted by the app (AES-256-GCM). Null until MFA setup.
-  totpSecretEnc  String?   @map("totp_secret_enc")
-  mfaEnabled     Boolean   @default(false) @map("mfa_enabled")
-  failedAttempts Int       @default(0) @map("failed_attempts")
-  lockedUntil    DateTime? @map("locked_until")
-  isActive       Boolean   @default(true) @map("is_active")
-  createdAt      DateTime  @default(now()) @map("created_at")
+  totpSecretEnc      String?   @map("totp_secret_enc")
+  mfaEnabled         Boolean   @default(false) @map("mfa_enabled")
+  failedAttempts     Int       @default(0) @map("failed_attempts")
+  lockedUntil        DateTime? @map("locked_until")
+  isActive           Boolean   @default(true) @map("is_active")
+  avatarPath         String?   @map("avatar_path")
+  securityQuestion   String?   @map("security_question") @db.VarChar(255)
+  securityAnswerHash String?   @map("security_answer_hash")
+  backupCodesHash    String?   @map("backup_codes_hash")
+  theme              String    @default("default") @db.VarChar(32)
+  fontSize           String    @default("md") @map("font_size") @db.VarChar(16)
+  createdAt          DateTime  @default(now()) @map("created_at")
 
   assignments    TenantAssignment[]
   custodyRecords CustodyRecord[]

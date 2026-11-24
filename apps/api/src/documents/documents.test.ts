@@ -109,4 +109,30 @@ describe("RBAC on documents", () => {
       entityId: parcelId,
     });
   });
+
+  it("blocks Tenant and IT from document history and activity logs", async () => {
+    const up = await upload("LEGAL", PDF);
+    await prisma.tenantAssignment.upsert({
+      where: { userId_parcelId: { userId: ids.TENANT, parcelId } },
+      update: {},
+      create: { userId: ids.TENANT, parcelId },
+    });
+    expect(
+      (await request(app).get(`/parcels/${parcelId}/documents/tracking`).set("Cookie", c.TENANT))
+        .status,
+    ).toBe(403);
+    expect(
+      (await request(app).get(`/documents/${up.body.id}/tracking`).set("Cookie", c.TENANT)).status,
+    ).toBe(403);
+    expect(
+      (await request(app).get(`/parcels/${parcelId}/documents/tracking`).set("Cookie", c.IT_ADMIN))
+        .status,
+    ).toBe(403);
+    const mgmt = await request(app)
+      .get(`/parcels/${parcelId}/documents/tracking`)
+      .set("Cookie", c.MANAGEMENT);
+    expect(mgmt.status).toBe(200);
+    expect(Array.isArray(mgmt.body.history)).toBe(true);
+    expect(Array.isArray(mgmt.body.logs)).toBe(true);
+  });
 });

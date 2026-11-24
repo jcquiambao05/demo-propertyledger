@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { Spinner } from "@/components/ConfirmModal";
 import { PaginationBar } from "@/components/PaginationBar";
 
-const AUDIT_PAGE_SIZE = 6;
+const AUDIT_PAGE_SIZE = 8;
 
 interface Entry {
   id: string;
@@ -13,6 +13,9 @@ interface Entry {
   entity: string;
   entityId: string | null;
   actor: string;
+  attemptedAccount?: string | null;
+  status?: string | null;
+  details?: Record<string, unknown> | null;
   createdAt: string;
   prevHash: string;
   entryHash: string;
@@ -25,6 +28,22 @@ interface Verify {
   reason: "prev_hash" | "entry_hash" | null;
   ms: number;
   verifiedAt: string;
+}
+
+function getActionBadgeClass(action: string, status?: string | null): string {
+  if (
+    action === "LOGIN_FAILED" ||
+    action === "ACCOUNT_LOCKED" ||
+    action === "LOGIN_BLOCKED_LOCKED" ||
+    status?.includes("LOCKED") ||
+    status?.includes("FAILED")
+  ) {
+    return "pill-danger font-mono text-[10px]";
+  }
+  if (action === "PASSWORD_RECOVERED" || action === "BACKUP_CODES_GENERATED") {
+    return "pill-warning font-mono text-[10px]";
+  }
+  return "pill-ok font-mono text-[10px]";
 }
 
 export default function AuditPage() {
@@ -70,6 +89,8 @@ export default function AuditPage() {
       (e) =>
         e.action.toLowerCase().includes(q) ||
         e.actor.toLowerCase().includes(q) ||
+        (e.attemptedAccount && e.attemptedAccount.toLowerCase().includes(q)) ||
+        (e.status && e.status.toLowerCase().includes(q)) ||
         e.entity.toLowerCase().includes(q) ||
         e.entryHash.toLowerCase().includes(q) ||
         e.id.toLowerCase().includes(q),
@@ -89,31 +110,26 @@ export default function AuditPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#76B82A]" aria-hidden="true" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-brand">
-              Activity History · IT Admin
-            </p>
-          </div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-brand">
+            Activity History · IT Admin
+          </p>
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <h1 className="text-xl font-semibold tracking-[-0.02em] text-ink">Audit Log</h1>
             {result &&
               (result.ok ? (
                 <span className="animate-fade-up pill-ok">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#76B82A]" aria-hidden="true" />
                   Chain verified · {result.checked} entries intact ({result.ms} ms)
                 </span>
               ) : (
                 <span className="animate-fade-up pill-danger">
-                  <span className="h-1.5 w-1.5 rounded-full bg-danger-dot" aria-hidden="true" />
                   Mismatch found at entry #{result.firstBrokenId}
                 </span>
               ))}
           </div>
           <p className="mt-1 text-xs text-muted">
             <span className="font-mono tabular-nums">{filtered.length}</span> of{" "}
-            <span className="font-mono tabular-nums">{total}</span> logged events. Each entry is
-            cryptographically linked so changes can&apos;t go unnoticed.
+            <span className="font-mono tabular-nums">{total}</span> logged events (including failed
+            login attempts, 30s lockouts, and password resets).
           </p>
         </div>
 
@@ -133,21 +149,24 @@ export default function AuditPage() {
       )}
 
       {error && (
-        <p role="alert" className="animate-fade-up rounded-xl border border-danger-border bg-danger-bg px-4 py-3 text-xs text-danger">
+        <p
+          role="alert"
+          className="animate-fade-up rounded-xl border border-danger-border bg-danger-bg px-4 py-3 text-xs text-danger"
+        >
           {error}
         </p>
       )}
 
       <div className="bento-shell">
         <div className="bento-core overflow-hidden p-0">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-[#F8FAF8] px-5 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-muted px-5 py-3">
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by action, person, record, or hash…"
+              placeholder="Search by action, account/username, status, or hash…"
               aria-label="Search audit entries"
-              className="w-72 rounded-lg border border-[#C8D3C8] bg-white px-3 py-1.5 text-xs text-ink placeholder:text-[#84968B] focus:border-brand focus:outline-none"
+              className="field max-w-xs py-1.5 text-xs"
             />
             <span className="font-mono text-[11px] text-muted">
               Tamper-evident SHA-256 log
@@ -156,12 +175,13 @@ export default function AuditPage() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-line bg-[#F7F9F6] text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+              <thead className="border-b border-line bg-surface-muted text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
                 <tr>
                   <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Person</th>
+                  <th className="px-4 py-3">Timestamp</th>
+                  <th className="px-4 py-3">Account / Person</th>
                   <th className="px-4 py-3">Action</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Record</th>
                   <th className="px-4 py-3">Hash (SHA-256)</th>
                 </tr>
@@ -171,25 +191,37 @@ export default function AuditPage() {
                   <tr
                     key={e.id}
                     className={`transition-colors ${
-                      result?.firstBrokenId === e.id ? "bg-danger-bg" : "hover:bg-[#F8FAF8]"
+                      result?.firstBrokenId === e.id
+                        ? "bg-danger-bg"
+                        : "hover:bg-[var(--epl-row-hover)]"
                     }`}
                   >
-                    <td className="px-4 py-3 font-mono tabular-nums text-[#3E5046]">{e.id}</td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono tabular-nums text-[#3E5046]">
+                    <td className="px-4 py-3 font-mono tabular-nums text-muted">{e.id}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono tabular-nums text-muted">
                       {new Date(e.createdAt).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 font-medium text-ink">{e.actor}</td>
+                    <td className="px-4 py-3 font-medium text-ink">
+                      <div>{e.actor}</div>
+                      {e.attemptedAccount && e.attemptedAccount !== e.actor && (
+                        <div className="font-mono text-[10px] text-muted">
+                          Account: {e.attemptedAccount}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
-                      <span className="rounded-md border border-[#DCE3DC] bg-[#F4F6F3] px-2 py-0.5 font-mono text-[11px] font-medium text-[#1A472A]">
+                      <span className={getActionBadgeClass(e.action, e.status)}>
                         {e.action}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-mono text-[#3E5046]">
+                    <td className="px-4 py-3 font-mono text-[11px] text-muted">
+                      {e.status ?? "OK"}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-muted">
                       {e.entity}
                       {e.entityId ? ` · ${e.entityId.slice(0, 8)}` : ""}
                     </td>
                     <td className="px-4 py-3 font-mono text-muted">
-                      {e.entryHash.slice(0, 18)}…
+                      {e.entryHash.slice(0, 16)}…
                     </td>
                   </tr>
                 ))}

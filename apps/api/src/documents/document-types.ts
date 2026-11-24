@@ -17,6 +17,8 @@ export const DOCUMENT_TYPES: DocumentType[] = [
   { name: "Tax Clearance", timeBound: true },
   { name: "Certification", timeBound: true },
   { name: "Permit", timeBound: true },
+  { name: "Site Photo / Media", timeBound: false },
+  { name: "Supporting Attachment", timeBound: false },
   { name: "Other", timeBound: false },
 ];
 

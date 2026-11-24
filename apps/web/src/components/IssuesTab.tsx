@@ -62,6 +62,7 @@ export function IssuesTab({ parcelId, canEdit }: { parcelId: string; canEdit: bo
   async function toggle(id: string) {
     if (openId === id) return setOpenId(null);
     setOpenId(id);
+    setChanges([]);
     try {
       setChanges((await api<{ changes: Change[] }>(`/issues/${id}`)).changes);
     } catch (e) {

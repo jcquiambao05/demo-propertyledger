@@ -8,7 +8,7 @@ import { prisma } from "../db.js";
 import { closeRedis, redis } from "../redis.js";
 import { encryptSecret } from "../auth/secrets.js";
 import { createSession } from "../auth/sessions.js";
-import { makeUser, cookieFor, lastAudit } from "../test/helpers.js";
+import { makeUser, cookieFor, lastAudit, TEST_PASSWORD } from "../test/helpers.js";
 
 const app = createApp();
 const SECRET = "JBSWY3DPEHPK3PXP";
@@ -164,6 +164,53 @@ describe("FR-04 user management (D13)", () => {
       userId: u.id,
       change: "SESSIONS_ENDED",
     });
+  });
+
+  it("allows IT Admin to edit a user's name and reset their password after verifying the admin's own password", async () => {
+    const targetUser = await makeUser("LEGAL");
+
+    // Wrong admin password rejected with 401
+    const wrongAdminPw = await request(app)
+      .patch(`/admin/users/${targetUser.id}`)
+      .set("Cookie", it2)
+      .send({
+        name: "Atty. Updated Name",
+        password: "NewStrong#2026",
+        adminPassword: "wrong-admin-password",
+      });
+    expect(wrongAdminPw.status).toBe(401);
+
+    // Weak target password rejected with 400
+    const weakPw = await request(app)
+      .patch(`/admin/users/${targetUser.id}`)
+      .set("Cookie", it2)
+      .send({
+        name: "Atty. Updated Name",
+        password: "weak",
+        adminPassword: TEST_PASSWORD,
+      });
+    expect(weakPw.status).toBe(400);
+
+    // Valid admin password updates target user's name and password
+    const okRes = await request(app)
+      .patch(`/admin/users/${targetUser.id}`)
+      .set("Cookie", it2)
+      .send({
+        name: "Atty. Updated Name",
+        position: "Chief Legal Officer",
+        password: "NewStrong#2026",
+        adminPassword: TEST_PASSWORD,
+      });
+    expect(okRes.status).toBe(200);
+    expect(okRes.body.name).toBe("Atty. Updated Name");
+    expect(okRes.body.position).toBe("Chief Legal Officer");
+
+    // Target user can log in with the new password set by the admin
+    const loginRes = await request(app).post("/auth/login").send({
+      email: targetUser.email,
+      password: "NewStrong#2026",
+    });
+    expect(loginRes.status).toBe(200);
   });
 });
 

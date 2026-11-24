@@ -25,8 +25,9 @@ export const config = {
 
 // STUDY_CONTEXT §8 security settings (defaults; the settings page is not in this build).
 export const security = {
-  failedSignInLimit: 5,
-  lockMinutes: 15,
+  failedSignInLimit: 3,
+  lockMinutes: 0.5, // 30-second cooldown after 3 consecutive failed attempts
+  lockSeconds: 30,
   requestsPerMinute: 100,
   inactivityMinutes: 30,
   maxSessionHours: 12,

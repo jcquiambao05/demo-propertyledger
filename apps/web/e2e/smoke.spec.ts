@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test("home page loads and shows title", async ({ page }) => {
+test("home redirects to sign-in and shows Eagle Property Ledger branding", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveTitle(/E Property Ledger/);
-  await expect(page.getByRole("heading", { name: "E Property Ledger" })).toBeVisible();
+  await expect(page).toHaveTitle(/Eagle Property Ledger/);
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
 });

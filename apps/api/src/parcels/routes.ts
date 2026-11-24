@@ -331,7 +331,13 @@ export function parcelsRouter(): Router {
         });
         if (updated.count === 0) return false;
         await appendAudit(
-          { actorId: user.id, action: "PARCEL_RETURNED", entity: "parcel", entityId: p.id },
+          {
+            actorId: user.id,
+            action: "PARCEL_RETURNED",
+            entity: "parcel",
+            entityId: p.id,
+            details: { remarks },
+          },
           tx,
         );
         return true;

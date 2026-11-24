@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Parcel } from "@/lib/types";
 import { PaginationBar } from "@/components/PaginationBar";
+import { formatAreaSqm } from "@/lib/area";
 
 const APPROVALS_PAGE_SIZE = 5;
 
@@ -28,12 +29,9 @@ export default function ApprovalsPage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-warning-dot" aria-hidden="true" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-brand">
-              Management Review
-            </p>
-          </div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-brand">
+            Management Review
+          </p>
           <h1 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink">
             Approvals Queue
           </h1>
@@ -66,7 +64,9 @@ export default function ApprovalsPage() {
               <div className="bento-core divide-y divide-line overflow-hidden p-0">
                 <div className="flex items-center justify-between bg-[#F7F9F6] px-5 py-3 text-xs font-semibold uppercase tracking-[0.04em] text-muted">
                   <span>Waiting for review</span>
-                  <span className="font-mono tabular-nums">{totalPendingHa.toFixed(2)} ha total</span>
+                  <span className="font-mono tabular-nums">
+                    {formatAreaSqm(totalPendingHa, { includeHa: true })} total
+                  </span>
                 </div>
                 <div key={page} className="animate-fade-up divide-y divide-line">
                   {pagedQueue.map((p) => (
@@ -78,7 +78,7 @@ export default function ApprovalsPage() {
                         <div className="flex items-center gap-2.5">
                           <p className="text-sm font-semibold text-ink">{p.name}</p>
                           <span className="rounded bg-[#EAF2EC] px-2 py-0.5 font-mono text-xs font-medium tabular-nums text-[#1A472A]">
-                            {p.areaHa.toFixed(2)} ha
+                            {formatAreaSqm(p.areaHa, { includeHa: true })}
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-muted">

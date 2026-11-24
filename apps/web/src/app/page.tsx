@@ -1,7 +1,11 @@
-export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-3xl font-semibold">E Property Ledger</h1>
-    </main>
-  );
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions, homeFor } from "@/lib/auth";
+
+export default async function Home() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.role) {
+    redirect("/login");
+  }
+  redirect(homeFor(session.user.role));
 }
